@@ -47,7 +47,7 @@ async function createPty(opts?: {
   cwd?: string;
   projectId?: string;
 }): Promise<CreateTerminalResponse> {
-  let body: { cwd?: string; projectId?: string } = {};
+  const body: { cwd?: string; projectId?: string } = {};
   if (opts?.cwd) body.cwd = opts.cwd;
   else if (opts?.projectId) body.projectId = opts.projectId;
   else {

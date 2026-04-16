@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import {
   Home,
   Folder,
-  ChevronLeft,
   ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
