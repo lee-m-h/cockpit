@@ -73,6 +73,52 @@ if [[ -n "$SHELL_PROFILE" ]]; then
   eval "$SHELL_CMD"
 fi
 
+# ---------- macOS 앱 등록 ----------
+if [[ "$(uname)" == "Darwin" ]]; then
+  APP_DIR="$HOME/Applications/Cockpit.app"
+  if [[ ! -d "$APP_DIR" ]]; then
+    log "macOS 앱으로 등록 중…"
+    mkdir -p "$APP_DIR/Contents/MacOS"
+    mkdir -p "$APP_DIR/Contents/Resources"
+
+    # 실행 파일
+    cat > "$APP_DIR/Contents/MacOS/Cockpit" << 'LAUNCHER'
+#!/usr/bin/env bash
+export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | tail -1)/bin:$PATH"
+cd "$HOME/.cockpit-app"
+exec ./start.sh
+LAUNCHER
+    chmod +x "$APP_DIR/Contents/MacOS/Cockpit"
+
+    # Info.plist
+    cat > "$APP_DIR/Contents/Info.plist" << 'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key>
+  <string>Cockpit</string>
+  <key>CFBundleDisplayName</key>
+  <string>Cockpit</string>
+  <key>CFBundleIdentifier</key>
+  <string>com.fnf.cockpit</string>
+  <key>CFBundleVersion</key>
+  <string>1.0.0</string>
+  <key>CFBundleExecutable</key>
+  <string>Cockpit</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>LSUIElement</key>
+  <false/>
+</dict>
+</plist>
+PLIST
+
+    log "Cockpit.app이 ~/Applications에 등록되었습니다."
+    log "Launchpad 또는 Spotlight에서 'Cockpit' 검색으로 실행 가능!"
+  fi
+fi
+
 # ---------- 실행 ----------
 log "설치 완료!"
 echo ""
