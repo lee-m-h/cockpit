@@ -80,7 +80,7 @@ function SplitNodeRenderer({
   );
 }
 
-/** PanelGroup + 더블클릭 균등 분할 */
+/** PanelGroup — childCount를 key에 반영하여 패널 추가 시 균등 리셋 */
 function SplitGroup({
   direction,
   groupId,
@@ -97,16 +97,16 @@ function SplitGroup({
   const resetLayout = () => {
     if (!groupRef.current) return;
     const equalSize = 100 / childCount;
-    const layout = Array(childCount).fill(equalSize);
-    groupRef.current.setLayout(layout);
+    groupRef.current.setLayout(Array(childCount).fill(equalSize));
   };
 
   return (
     <PanelGroup
+      // key에 childCount 포함 → 패널 수 변경 시 PanelGroup 재생성 → defaultSize 적용
+      key={`${groupId}-${childCount}`}
       ref={groupRef}
       direction={direction}
       className="h-full w-full"
-      autoSaveId={groupId}
     >
       {injectHandles(children, direction, resetLayout)}
     </PanelGroup>
