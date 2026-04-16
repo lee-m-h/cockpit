@@ -93,12 +93,14 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
         <Button onClick={openTerminal}>
           <TerminalIcon size={14} /> 터미널 열기
         </Button>
-        <Button variant="outline" disabled title="Cycle 3 예정">
-          <KanbanSquare size={14} /> 칸반 (예정)
+        <Button variant="outline" onClick={() => router.push("/kanban")}>
+          <KanbanSquare size={14} /> 칸반
         </Button>
-        <Button variant="outline" disabled title="Cycle 4 예정">
-          <GitBranch size={14} /> Git (예정)
-        </Button>
+        {project.isGitRepo && (
+          <Button variant="outline" onClick={() => router.push("/git")}>
+            <GitBranch size={14} /> Git
+          </Button>
+        )}
       </div>
 
       {/* 파일 트리 */}
