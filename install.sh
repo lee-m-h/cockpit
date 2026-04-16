@@ -74,12 +74,21 @@ if [[ -n "$SHELL_PROFILE" ]]; then
 fi
 
 # ---------- 실행 ----------
-log "설치 완료! 실행합니다…"
+log "설치 완료!"
 echo ""
-echo "  다음부터는 아무 디렉토리에서나:"
+echo "  ┌──────────────────────────────────────────┐"
+echo "  │  새 터미널을 열거나 아래 명령어를 실행:   │"
+echo "  │                                          │"
+echo "  │    source ~/.zshrc                       │"
+echo "  │                                          │"
+echo "  │  이후 아무 디렉토리에서:                  │"
+echo "  │                                          │"
+echo "  │    cockpit          # 웹 버전 실행        │"
+echo "  │    cockpit --app    # 데스크탑 앱 실행    │"
+echo "  │    cockpit --stop   # 중지               │"
+echo "  └──────────────────────────────────────────┘"
 echo ""
-echo "    cockpit          # 실행"
-echo "    cockpit --stop   # 중지"
+log "지금 바로 실행합니다…"
 echo ""
 
 exec ./start.sh "$@"
