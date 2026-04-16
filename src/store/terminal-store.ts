@@ -118,6 +118,49 @@ function prunePanes(node: SplitNode, alive: Set<string>): SplitNode | null {
   return { ...node, children };
 }
 
+/**
+ * 같은 방향의 부모 split이 있으면 자식으로 추가 (플랫 3+분할).
+ * 없으면 새 split 노드로 교체 (기존 동작).
+ */
+function addToSplitOrReplace(
+  node: SplitNode,
+  targetPaneId: string,
+  direction: SplitDirection,
+  newPane: TerminalPane,
+): SplitNode {
+  if (node.type === "leaf") {
+    if (node.pane.id === targetPaneId) {
+      // 부모가 없으니 새 split 생성
+      return {
+        type: "split",
+        direction,
+        children: [node, { type: "leaf", pane: newPane }],
+      };
+    }
+    return node;
+  }
+
+  // split 노드: 자식 중에 대상 pane이 직접 있고 방향이 같으면 → 자식 추가
+  if (node.direction === direction) {
+    const idx = node.children.findIndex(
+      (c) => c.type === "leaf" && c.pane.id === targetPaneId,
+    );
+    if (idx >= 0) {
+      const newChildren = [...node.children];
+      newChildren.splice(idx + 1, 0, { type: "leaf", pane: newPane });
+      return { ...node, children: newChildren };
+    }
+  }
+
+  // 재귀적으로 자식 탐색
+  return {
+    ...node,
+    children: node.children.map((c) =>
+      addToSplitOrReplace(c, targetPaneId, direction, newPane),
+    ),
+  };
+}
+
 function shortCwd(cwd: string): string {
   const base = cwd.split("/").filter(Boolean).pop() ?? "/";
   return base || "~";
@@ -242,20 +285,19 @@ export const useTerminalStore = create<TerminalState>()(
           cwd: res.cwd,
           title: shortCwd(res.cwd),
         };
-        const replacement: SplitNode = {
-          type: "split",
-          direction,
-          children: [
-            { type: "leaf", pane: currentPane! },
-            { type: "leaf", pane: newPane },
-          ],
-        };
+
         set((s) => ({
-          tabs: s.tabs.map((t) =>
-            t.id === tab.id
-              ? { ...t, root: replaceLeaf(t.root, paneId, replacement) }
-              : t,
-          ),
+          tabs: s.tabs.map((t) => {
+            if (t.id !== tab.id) return t;
+            // 같은 방향의 부모 split이 있으면 자식 추가 (플랫 구조 유지)
+            const newRoot = addToSplitOrReplace(
+              t.root,
+              paneId,
+              direction,
+              newPane,
+            );
+            return { ...t, root: newRoot };
+          }),
         }));
       },
 

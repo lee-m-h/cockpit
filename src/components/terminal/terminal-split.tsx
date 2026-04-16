@@ -126,24 +126,30 @@ function injectHandles(
   items.forEach((child, i) => {
     if (i > 0) {
       result.push(
-        <div
+        <PanelResizeHandle
           key={`handle-${i}`}
-          onDoubleClick={onDoubleClick}
           className={
             isHorizontal
-              ? "flex items-stretch cursor-col-resize"
-              : "flex flex-col justify-stretch cursor-row-resize"
+              ? "group/handle relative w-[5px] bg-[var(--color-border)] hover:bg-[var(--color-accent)] data-[resize-handle-state=drag]:bg-[var(--color-accent)] transition-colors cursor-col-resize"
+              : "group/handle relative h-[5px] bg-[var(--color-border)] hover:bg-[var(--color-accent)] data-[resize-handle-state=drag]:bg-[var(--color-accent)] transition-colors cursor-row-resize"
           }
-          title="더블클릭으로 균등 분할"
         >
-          <PanelResizeHandle
+          {/* 균등 분할 버튼 — 핸들 호버 시 표시 */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDoubleClick();
+            }}
             className={
               isHorizontal
-                ? "w-[3px] bg-[var(--color-border)] hover:bg-[var(--color-accent)] data-[resize-handle-state=drag]:bg-[var(--color-accent)] transition-colors"
-                : "h-[3px] bg-[var(--color-border)] hover:bg-[var(--color-accent)] data-[resize-handle-state=drag]:bg-[var(--color-accent)] transition-colors"
+                ? "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-6 rounded-sm bg-[var(--color-surface)] border border-[var(--color-border)] text-[8px] text-[var(--color-foreground-dim)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] opacity-0 group-hover/handle:opacity-100 transition-opacity z-10 flex items-center justify-center"
+                : "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-6 rounded-sm bg-[var(--color-surface)] border border-[var(--color-border)] text-[8px] text-[var(--color-foreground-dim)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] opacity-0 group-hover/handle:opacity-100 transition-opacity z-10 flex items-center justify-center"
             }
-          />
-        </div>,
+            title="균등 분할"
+          >
+            ⫶
+          </button>
+        </PanelResizeHandle>,
       );
     }
     result.push(child);
