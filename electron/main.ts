@@ -1,45 +1,23 @@
-import { app, BrowserWindow, Menu, shell, dialog } from "electron";
+import { app, BrowserWindow, Menu, shell } from "electron";
 import { spawn, type ChildProcess } from "child_process";
-import * as net from "net";
 import * as path from "path";
 import * as http from "http";
-import { autoUpdater } from "electron-updater";
 
-const IS_DEV = !app.isPackaged;
-const ROOT = IS_DEV
-  ? path.resolve(__dirname, "..")
-  : path.resolve(process.resourcesPath, "app");
+const ROOT = path.resolve(__dirname, "..");
 
 let mainWindow: BrowserWindow | null = null;
 let serverProcess: ChildProcess | null = null;
-let serverPort = 0;
-
-// ─── 빈 포트 찾기 ────────────────────────────────────────────
-function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const srv = net.createServer();
-    srv.listen(0, "127.0.0.1", () => {
-      const addr = srv.address();
-      if (!addr || typeof addr === "string") {
-        srv.close();
-        return reject(new Error("포트 할당 실패"));
-      }
-      const port = addr.port;
-      srv.close(() => resolve(port));
-    });
-    srv.on("error", reject);
-  });
-}
+const PORT = 4000;
 
 // ─── 서버 기동 대기 ──────────────────────────────────────────
-function waitForServer(port: number, timeoutMs = 30_000): Promise<void> {
+function waitForServer(timeoutMs = 30_000): Promise<void> {
   const start = Date.now();
   return new Promise((resolve, reject) => {
     const check = () => {
       if (Date.now() - start > timeoutMs) {
         return reject(new Error("서버 기동 타임아웃 (30초)"));
       }
-      const req = http.get(`http://127.0.0.1:${port}/api/health`, (res) => {
+      const req = http.get(`http://127.0.0.1:${PORT}/api/health`, (res) => {
         if (res.statusCode === 200) return resolve();
         setTimeout(check, 500);
       });
@@ -51,38 +29,21 @@ function waitForServer(port: number, timeoutMs = 30_000): Promise<void> {
 }
 
 // ─── 서버 프로세스 시작 ──────────────────────────────────────
-async function startServer(): Promise<number> {
-  const port = IS_DEV ? 4000 : await findFreePort();
-  serverPort = port;
-
+function startServer(): void {
   const serverScript = path.join(ROOT, "server.ts");
   const tsxBin = path.join(ROOT, "node_modules", ".bin", "tsx");
 
-  // 개발: node_modules/.bin/tsx 직접 실행
-  // 프로덕션: npx tsx (시스템 node 사용) — Electron 바이너리로는 tsx 실행 불가
-  const child = IS_DEV
-    ? spawn(tsxBin, [serverScript], {
-        cwd: ROOT,
-        env: {
-          ...process.env,
-          PORT: String(port),
-          HOST: "127.0.0.1",
-          NODE_ENV: "development",
-        },
-        stdio: ["ignore", "pipe", "pipe"],
-        shell: process.platform === "win32",
-      })
-    : spawn("npx", ["tsx", serverScript], {
-        cwd: ROOT,
-        env: {
-          ...process.env,
-          PORT: String(port),
-          HOST: "127.0.0.1",
-          NODE_ENV: "production",
-        },
-        stdio: ["ignore", "pipe", "pipe"],
-        shell: true, // npx를 찾기 위해 shell 필요
-      });
+  const child = spawn(tsxBin, [serverScript], {
+    cwd: ROOT,
+    env: {
+      ...process.env,
+      PORT: String(PORT),
+      HOST: "127.0.0.1",
+      NODE_ENV: "development",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+    shell: process.platform === "win32",
+  });
 
   child.stdout?.on("data", (data: Buffer) => {
     console.log(`[server] ${data.toString().trim()}`);
@@ -96,67 +57,24 @@ async function startServer(): Promise<number> {
   });
 
   serverProcess = child;
-  return port;
-}
-
-// ─── 자동 업데이트 ───────────────────────────────────────────
-function setupAutoUpdater(): void {
-  if (IS_DEV) return; // 개발 모드에서는 비활성
-
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
-
-  autoUpdater.on("update-available", (info) => {
-    console.log(`[updater] 새 버전 발견: v${info.version}`);
-  });
-
-  autoUpdater.on("update-downloaded", (info) => {
-    console.log(`[updater] 다운로드 완료: v${info.version}`);
-    // 사용자에게 알림
-    if (mainWindow) {
-      dialog
-        .showMessageBox(mainWindow, {
-          type: "info",
-          title: "업데이트",
-          message: `새 버전 (v${info.version})이 준비되었습니다.`,
-          detail: "앱을 재시작하면 업데이트가 적용됩니다.",
-          buttons: ["지금 재시작", "나중에"],
-          defaultId: 0,
-        })
-        .then(({ response }) => {
-          if (response === 0) {
-            autoUpdater.quitAndInstall();
-          }
-        });
-    }
-  });
-
-  autoUpdater.on("error", (err) => {
-    console.error("[updater] 오류:", err.message);
-  });
-
-  // 시작 후 5초 뒤 업데이트 확인
-  setTimeout(() => {
-    autoUpdater.checkForUpdates().catch(() => {});
-  }, 5000);
 }
 
 // ─── 메뉴 ────────────────────────────────────────────────────
 function buildMenu(): void {
   const isMac = process.platform === "darwin";
-  const template: Electron.MenuItemConstructorOptions[] = [
+  const template: any[] = [
     ...(isMac
       ? [
           {
             label: app.name,
             submenu: [
-              { role: "about" as const },
-              { type: "separator" as const },
-              { role: "hide" as const },
-              { role: "hideOthers" as const },
-              { role: "unhide" as const },
-              { type: "separator" as const },
-              { role: "quit" as const },
+              { role: "about" },
+              { type: "separator" },
+              { role: "hide" },
+              { role: "hideOthers" },
+              { role: "unhide" },
+              { type: "separator" },
+              { role: "quit" },
             ],
           },
         ]
@@ -192,7 +110,7 @@ function buildMenu(): void {
 }
 
 // ─── 창 생성 ─────────────────────────────────────────────────
-function createWindow(port: number): void {
+function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -207,10 +125,9 @@ function createWindow(port: number): void {
     },
   });
 
-  mainWindow.loadURL(`http://127.0.0.1:${port}`);
+  mainWindow.loadURL(`http://127.0.0.1:${PORT}`);
 
-  // 외부 링크는 기본 브라우저에서 열기
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+  mainWindow.webContents.setWindowOpenHandler(({ url }: any) => {
     if (url.startsWith("http://127.0.0.1")) return { action: "allow" };
     shell.openExternal(url);
     return { action: "deny" };
@@ -224,22 +141,21 @@ function createWindow(port: number): void {
 // ─── 앱 라이프사이클 ─────────────────────────────────────────
 app.whenReady().then(async () => {
   buildMenu();
-  setupAutoUpdater();
+  startServer();
 
   try {
-    const port = await startServer();
-    console.log(`[cockpit] 서버 시작 중 (port=${port})…`);
-    await waitForServer(port);
+    console.log(`[cockpit] 서버 시작 중 (port=${PORT})…`);
+    await waitForServer();
     console.log(`[cockpit] 서버 준비 완료!`);
-    createWindow(port);
+    createWindow();
   } catch (err) {
     console.error("[cockpit] 서버 시작 실패:", err);
     app.quit();
   }
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0 && serverPort > 0) {
-      createWindow(serverPort);
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
     }
   });
 });

@@ -11,44 +11,11 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "electron:dev": "tsc -p electron/tsconfig.json && electron .",
-    "electron:build": "next build && tsc -p electron/tsconfig.json && electron-builder",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "fix-pty-perms": "node scripts/fix-pty-perms.mjs",
     "postinstall": "node scripts/fix-pty-perms.mjs && prisma generate"
-  },
-  "build": {
-    "appId": "com.fnf.cockpit",
-    "productName": "Cockpit",
-    "files": [
-      "dist-electron/**/*",
-      ".next/**/*",
-      "server.ts",
-      "src/**/*",
-      "prisma/**/*",
-      "node_modules/**/*",
-      "package.json",
-      ".env"
-    ],
-    "mac": {
-      "target": "dmg",
-      "category": "public.app-category.developer-tools"
-    },
-    "win": {
-      "target": "nsis"
-    },
-    "extraResources": [
-      {
-        "from": "prisma",
-        "to": "prisma"
-      }
-    ],
-    "publish": {
-      "provider": "github",
-      "owner": "lee-m-h",
-      "repo": "cockpit"
-    }
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -66,7 +33,6 @@
     "@xterm/xterm": "^5.5.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "electron-updater": "^6.8.3",
     "lucide-react": "^0.469.0",
     "next": "^15.1.3",
     "node-pty": "^1.0.0",
@@ -79,14 +45,12 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
-    "@electron/rebuild": "^4.0.3",
     "@tailwindcss/postcss": "^4.0.0-beta.7",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "@types/ws": "^8.5.13",
     "electron": "^41.2.1",
-    "electron-builder": "^26.8.1",
     "eslint": "^9.17.0",
     "eslint-config-next": "^15.1.3",
     "postcss": "^8.4.49",

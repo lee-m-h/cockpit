@@ -2,9 +2,10 @@
 # Cockpit 간편 실행 스크립트 — 팀원 공유용
 #
 # 사용법:
-#   ./start.sh             # 백그라운드 실행 + 브라우저 오픈
-#   ./start.sh --fg        # 포그라운드(터미널 점유) 실행
-#   ./start.sh --stop      # 실행 중인 Cockpit 중지
+#   ./start.sh             # 데스크탑 앱 실행 (백그라운드)
+#   ./start.sh --web       # 웹 버전 실행 (브라우저)
+#   ./start.sh --fg        # 포그라운드 실행 (터미널 점유)
+#   ./start.sh --stop      # 중지
 #
 set -euo pipefail
 
@@ -40,15 +41,6 @@ stop_cockpit() {
 if [[ "${1:-}" == "--stop" ]]; then
   stop_cockpit
   exit 0
-fi
-
-# ---------- app mode (Electron) ----------
-if [[ "${1:-}" == "--app" ]]; then
-  log "데스크탑 앱 모드로 실행합니다…"
-  # Electron은 내부에서 서버를 자동 시작하므로 기존 서버 중지
-  stop_cockpit 2>/dev/null || true
-  pnpm tsc -p electron/tsconfig.json 2>/dev/null
-  exec pnpm electron .
 fi
 
 # ---------- auto update ----------
@@ -93,10 +85,6 @@ if [[ -f "$PID_FILE" ]]; then
   existing_pid=$(cat "$PID_FILE")
   if kill -0 "$existing_pid" 2>/dev/null; then
     log "Cockpit이 이미 실행 중입니다 (pid=$existing_pid)."
-    if [[ "${1:-}" != "--fg" ]]; then
-      log "브라우저를 엽니다…"
-      open "http://127.0.0.1:${PORT:-4000}" 2>/dev/null || true
-    fi
     exit 0
   else
     rm -f "$PID_FILE"
@@ -108,7 +96,6 @@ if [[ ! -d "node_modules" ]]; then
   log "의존성을 설치합니다 (pnpm install)…"
   pnpm install
 else
-  # package.json 변경 감지
   if [[ "package.json" -nt "node_modules/.package-install-stamp" ]] 2>/dev/null || [[ ! -f "node_modules/.package-install-stamp" ]]; then
     log "package.json 변경 감지 — 의존성 재설치…"
     pnpm install
@@ -117,7 +104,6 @@ else
 fi
 
 # ---------- env file ----------
-# .env는 committed(공통 기본값), .env.local은 개인 오버라이드(optional)
 if [[ ! -f ".env" ]]; then
   err ".env 파일이 없습니다. 저장소를 다시 clone하거나 .env.example을 .env.local로 복사하세요."
   exit 1
@@ -135,29 +121,41 @@ mkdir -p "$LOG_DIR"
 PORT="${PORT:-4000}"
 HOST="${HOST:-127.0.0.1}"
 
+# 포그라운드 모드
 if [[ "${1:-}" == "--fg" ]]; then
   log "포그라운드로 실행합니다 (http://$HOST:$PORT). 중지: Ctrl+C"
   exec pnpm dev
 fi
 
-log "백그라운드로 실행합니다 (http://$HOST:$PORT)"
-# nohup + disown으로 셸 종료 후에도 유지
-nohup pnpm dev >"$LOG_FILE" 2>&1 &
+# 웹 모드 (브라우저)
+if [[ "${1:-}" == "--web" ]]; then
+  log "웹 모드로 실행합니다 (http://$HOST:$PORT)"
+  nohup pnpm dev >"$LOG_FILE" 2>&1 &
+  echo $! > "$PID_FILE"
+  disown || true
+
+  log "기동 대기 중…"
+  for i in {1..30}; do
+    if curl -fs "http://$HOST:$PORT/api/health" >/dev/null 2>&1; then
+      log "준비 완료! 브라우저를 엽니다."
+      open "http://$HOST:$PORT" 2>/dev/null || true
+      log "로그: tail -f $LOG_FILE"
+      log "중지: cockpit --stop"
+      exit 0
+    fi
+    sleep 1
+  done
+  err "서버가 30초 안에 응답하지 않았습니다. 로그: $LOG_FILE"
+  exit 1
+fi
+
+# ---------- 기본: 데스크탑 앱 (Electron) 백그라운드 ----------
+log "데스크탑 앱을 실행합니다…"
+pnpm tsc -p electron/tsconfig.json 2>/dev/null || true
+
+nohup pnpm electron . >"$LOG_FILE" 2>&1 &
 echo $! > "$PID_FILE"
 disown || true
 
-# 서버 기동 대기 (최대 30초)
-log "기동 대기 중…"
-for i in {1..30}; do
-  if curl -fs "http://$HOST:$PORT/api/health" >/dev/null 2>&1; then
-    log "준비 완료! 브라우저를 엽니다."
-    open "http://$HOST:$PORT" 2>/dev/null || true
-    log "로그: tail -f $LOG_FILE"
-    log "중지: ./start.sh --stop"
-    exit 0
-  fi
-  sleep 1
-done
-
-err "서버가 30초 안에 응답하지 않았습니다. 로그를 확인하세요: $LOG_FILE"
-exit 1
+log "앱이 백그라운드에서 시작됩니다."
+log "중지: cockpit --stop"
