@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown, ChevronRight, Folder, Pencil, Trash2 } from "lucide-react";
+import { useDroppable } from "@dnd-kit/core";
 import { useDeleteFolder, useUpdateFolder } from "@/hooks/use-projects";
 import {
   DropdownMenu,
@@ -31,6 +32,11 @@ export function ProjectFolderGroup({
   const updateMut = useUpdateFolder();
   const deleteMut = useDeleteFolder();
 
+  const { setNodeRef, isOver } = useDroppable({
+    id: `folder-${folder.id}`,
+    data: { type: "folder", folderId: folder.id },
+  });
+
   const toggle = () =>
     updateMut.mutate({ id: folder.id, collapsed: !folder.collapsed });
 
@@ -54,7 +60,12 @@ export function ProjectFolderGroup({
   };
 
   return (
-    <div>
+    <div
+      ref={setNodeRef}
+      className={`rounded transition-colors ${
+        isOver ? "bg-[var(--color-accent)]/10" : ""
+      }`}
+    >
       <div className="group flex items-center gap-1 px-1 py-1 text-xs text-[var(--color-foreground-muted)] uppercase tracking-wider">
         <button
           onClick={toggle}
@@ -108,10 +119,10 @@ export function ProjectFolderGroup({
         </DropdownMenu>
       </div>
       {!folder.collapsed && (
-        <div className="flex flex-col gap-0.5 pl-1">
+        <div className="flex flex-col gap-0.5 pl-1 min-h-[28px]">
           {projects.length === 0 ? (
             <div className="px-3 py-1 text-xs text-[var(--color-foreground-dim)]">
-              비어 있음
+              {isOver ? "여기에 놓기" : "비어 있음"}
             </div>
           ) : (
             projects.map((p) => (
@@ -120,6 +131,7 @@ export function ProjectFolderGroup({
                 project={p}
                 folders={folders}
                 onEdit={onEditProject}
+                draggable
               />
             ))
           )}
