@@ -126,16 +126,24 @@ function injectHandles(
   items.forEach((child, i) => {
     if (i > 0) {
       result.push(
-        <PanelResizeHandle
+        <div
           key={`handle-${i}`}
           onDoubleClick={onDoubleClick}
           className={
             isHorizontal
-              ? "w-[3px] bg-[var(--color-border)] hover:bg-[var(--color-accent)] data-[resize-handle-state=drag]:bg-[var(--color-accent)] transition-colors cursor-col-resize"
-              : "h-[3px] bg-[var(--color-border)] hover:bg-[var(--color-accent)] data-[resize-handle-state=drag]:bg-[var(--color-accent)] transition-colors cursor-row-resize"
+              ? "flex items-stretch cursor-col-resize"
+              : "flex flex-col justify-stretch cursor-row-resize"
           }
           title="더블클릭으로 균등 분할"
-        />,
+        >
+          <PanelResizeHandle
+            className={
+              isHorizontal
+                ? "w-[3px] bg-[var(--color-border)] hover:bg-[var(--color-accent)] data-[resize-handle-state=drag]:bg-[var(--color-accent)] transition-colors"
+                : "h-[3px] bg-[var(--color-border)] hover:bg-[var(--color-accent)] data-[resize-handle-state=drag]:bg-[var(--color-accent)] transition-colors"
+            }
+          />
+        </div>,
       );
     }
     result.push(child);
