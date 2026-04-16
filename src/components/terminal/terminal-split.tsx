@@ -136,7 +136,7 @@ function injectHandles(
         >
           {/* 균등 분할 버튼 — 핸들 호버 시 표시 */}
           <button
-            onClick={(e) => {
+            onDoubleClick={(e) => {
               e.stopPropagation();
               onDoubleClick();
             }}
