@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  output: "standalone", // Electron 패키징용 자체 포함 빌드
   // node-pty, ws는 서버 전용
   serverExternalPackages: ["node-pty", "ws"],
   experimental: {

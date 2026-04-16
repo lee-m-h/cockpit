@@ -37,3 +37,7 @@ next-env.d.ts
 .cockpit.pid
 .cockpit-check*.pid
 logs/
+
+# electron
+dist-electron/
+release/
