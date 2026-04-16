@@ -3,7 +3,8 @@ import pkg from "./package.json";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  output: "standalone", // Electron 패키징용 자체 포함 빌드
+  // Electron 패키징용 자체 포함 빌드 (NEXT_OUTPUT=default 로 비활성화 가능)
+  output: process.env.NEXT_OUTPUT === "default" ? undefined : "standalone",
   // node-pty, ws는 서버 전용
   serverExternalPackages: ["node-pty", "ws"],
   env: {

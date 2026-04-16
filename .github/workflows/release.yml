@@ -5,6 +5,9 @@ on:
     tags:
       - "v*" # v1.0.0, v1.1.0 등 태그 push 시 빌드
 
+permissions:
+  contents: write # GitHub Releases 생성/업로드 권한
+
 jobs:
   build:
     strategy:
@@ -33,15 +36,11 @@ jobs:
       - name: Build Next.js
         run: pnpm build
         env:
-          # Windows standalone 빌드 시 시스템 폴더 스캔 EPERM 방지
-          USERPROFILE: ${{ runner.temp }}
-          HOME: ${{ runner.temp }}
+          # Windows standalone 빌드 시 EPERM 회피 — standalone 비활성화
+          NEXT_OUTPUT: ${{ matrix.platform == 'win' && 'default' || '' }}
 
       - name: Build Electron
         run: pnpm tsc -p electron/tsconfig.json
-
-      - name: Rebuild native modules for Electron
-        run: pnpm electron-rebuild
 
       - name: Package (${{ matrix.platform }})
         run: pnpm electron-builder --${{ matrix.platform }} --publish always
