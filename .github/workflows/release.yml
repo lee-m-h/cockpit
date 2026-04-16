@@ -1,0 +1,46 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*" # v1.0.0, v1.1.0 등 태그 push 시 빌드
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+          - os: windows-latest
+            platform: win
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build Next.js
+        run: pnpm build
+
+      - name: Build Electron
+        run: pnpm tsc -p electron/tsconfig.json
+
+      - name: Rebuild native modules for Electron
+        run: pnpm electron-rebuild
+
+      - name: Package (${{ matrix.platform }})
+        run: pnpm electron-builder --${{ matrix.platform }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

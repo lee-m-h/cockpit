@@ -1,8 +1,9 @@
-import { app, BrowserWindow, Menu, shell } from "electron";
-import { fork, type ChildProcess } from "child_process";
+import { app, BrowserWindow, Menu, shell, dialog } from "electron";
+import { spawn, type ChildProcess } from "child_process";
 import * as net from "net";
 import * as path from "path";
 import * as http from "http";
+import { autoUpdater } from "electron-updater";
 
 const IS_DEV = !app.isPackaged;
 const ROOT = IS_DEV
@@ -55,27 +56,8 @@ async function startServer(): Promise<number> {
   serverPort = port;
 
   const serverScript = path.join(ROOT, "server.ts");
-  const tsxBin = IS_DEV
-    ? path.join(ROOT, "node_modules", ".bin", "tsx")
-    : path.join(ROOT, "node_modules", ".bin", "tsx");
+  const tsxBin = path.join(ROOT, "node_modules", ".bin", "tsx");
 
-  serverProcess = fork(tsxBin, [serverScript], {
-    cwd: ROOT,
-    env: {
-      ...process.env,
-      PORT: String(port),
-      HOST: "127.0.0.1",
-      NODE_ENV: IS_DEV ? "development" : "production",
-    },
-    stdio: "pipe",
-    // fork는 execPath를 써서 tsx를 직접 실행하기 어려움 → spawn 사용
-  });
-
-  // fork 대신 spawn으로 변경 (tsx가 별도 실행파일이므로)
-  serverProcess.kill();
-  serverProcess = null;
-
-  const { spawn } = await import("child_process");
   const child = spawn(tsxBin, [serverScript], {
     cwd: ROOT,
     env: {
@@ -85,6 +67,8 @@ async function startServer(): Promise<number> {
       NODE_ENV: IS_DEV ? "development" : "production",
     },
     stdio: ["ignore", "pipe", "pipe"],
+    // Windows에서 .cmd 확장자 처리
+    shell: process.platform === "win32",
   });
 
   child.stdout?.on("data", (data: Buffer) => {
@@ -100,6 +84,48 @@ async function startServer(): Promise<number> {
 
   serverProcess = child;
   return port;
+}
+
+// ─── 자동 업데이트 ───────────────────────────────────────────
+function setupAutoUpdater(): void {
+  if (IS_DEV) return; // 개발 모드에서는 비활성
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("update-available", (info) => {
+    console.log(`[updater] 새 버전 발견: v${info.version}`);
+  });
+
+  autoUpdater.on("update-downloaded", (info) => {
+    console.log(`[updater] 다운로드 완료: v${info.version}`);
+    // 사용자에게 알림
+    if (mainWindow) {
+      dialog
+        .showMessageBox(mainWindow, {
+          type: "info",
+          title: "업데이트",
+          message: `새 버전 (v${info.version})이 준비되었습니다.`,
+          detail: "앱을 재시작하면 업데이트가 적용됩니다.",
+          buttons: ["지금 재시작", "나중에"],
+          defaultId: 0,
+        })
+        .then(({ response }) => {
+          if (response === 0) {
+            autoUpdater.quitAndInstall();
+          }
+        });
+    }
+  });
+
+  autoUpdater.on("error", (err) => {
+    console.error("[updater] 오류:", err.message);
+  });
+
+  // 시작 후 5초 뒤 업데이트 확인
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch(() => {});
+  }, 5000);
 }
 
 // ─── 메뉴 ────────────────────────────────────────────────────
@@ -185,6 +211,7 @@ function createWindow(port: number): void {
 // ─── 앱 라이프사이클 ─────────────────────────────────────────
 app.whenReady().then(async () => {
   buildMenu();
+  setupAutoUpdater();
 
   try {
     const port = await startServer();
@@ -198,7 +225,6 @@ app.whenReady().then(async () => {
   }
 
   app.on("activate", () => {
-    // macOS: dock 아이콘 클릭 시 창 재생성
     if (BrowserWindow.getAllWindows().length === 0 && serverPort > 0) {
       createWindow(serverPort);
     }
@@ -206,14 +232,12 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-  // macOS에서는 앱 유지
   if (process.platform !== "darwin") {
     app.quit();
   }
 });
 
 app.on("before-quit", () => {
-  // 서버 프로세스 정리
   if (serverProcess && !serverProcess.killed) {
     serverProcess.kill("SIGTERM");
     serverProcess = null;
