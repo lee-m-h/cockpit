@@ -12,7 +12,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ko" className="dark">
+    <html lang="ko" data-theme="system" suppressHydrationWarning>
       <body>
         <Providers>
           <AppShell>{children}</AppShell>

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
+/* ─── 다크 테마 (기본) ─── */
 @theme {
-  /* Cockpit 다크 테마 기본 */
   --color-background: #0b0d12;
   --color-surface: #121621;
   --color-surface-hover: #1a1f2e;
@@ -25,6 +25,42 @@
     sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas,
     monospace;
+}
+
+/* ─── 라이트 테마 ─── */
+[data-theme="light"] {
+  --color-background: #f8f9fb;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f0f1f4;
+  --color-border: #e0e3e8;
+  --color-border-strong: #cdd1d9;
+  --color-foreground: #1a1d24;
+  --color-foreground-muted: #5c6370;
+  --color-foreground-dim: #9ca3af;
+  --color-accent: #2563eb;
+  --color-accent-hover: #3b82f6;
+  --color-danger: #dc2626;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+}
+
+/* ─── 시스템 모드: 라이트일 때만 오버라이드 ─── */
+@media (prefers-color-scheme: light) {
+  [data-theme="system"] {
+    --color-background: #f8f9fb;
+    --color-surface: #ffffff;
+    --color-surface-hover: #f0f1f4;
+    --color-border: #e0e3e8;
+    --color-border-strong: #cdd1d9;
+    --color-foreground: #1a1d24;
+    --color-foreground-muted: #5c6370;
+    --color-foreground-dim: #9ca3af;
+    --color-accent: #2563eb;
+    --color-accent-hover: #3b82f6;
+    --color-danger: #dc2626;
+    --color-success: #16a34a;
+    --color-warning: #d97706;
+  }
 }
 
 html,
