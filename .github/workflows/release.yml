@@ -11,13 +11,15 @@ permissions:
 jobs:
   build:
     strategy:
-      fail-fast: false # Mac/Win 독립 빌드 — 한쪽 실패해도 나머지 계속
+      fail-fast: false
       matrix:
         include:
           - os: macos-latest
             platform: mac
+            next_output: ""
           - os: windows-latest
             platform: win
+            next_output: "default"
 
     runs-on: ${{ matrix.os }}
 
@@ -36,8 +38,7 @@ jobs:
       - name: Build Next.js
         run: pnpm build
         env:
-          # Windows standalone 빌드 시 EPERM 회피 — standalone 비활성화
-          NEXT_OUTPUT: ${{ matrix.platform == 'win' && 'default' || '' }}
+          NEXT_OUTPUT: ${{ matrix.next_output }}
 
       - name: Build Electron
         run: pnpm tsc -p electron/tsconfig.json
