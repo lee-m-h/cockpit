@@ -40,4 +40,5 @@ logs/
 
 # electron
 dist-electron/
+dist-server/
 release/

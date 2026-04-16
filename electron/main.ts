@@ -55,21 +55,35 @@ async function startServer(): Promise<number> {
   const port = IS_DEV ? 4000 : await findFreePort();
   serverPort = port;
 
+  // tsx로 server.ts 실행 (dev/prod 공통)
+  // 패키징 시 tsx는 node_modules에 포함됨
   const serverScript = path.join(ROOT, "server.ts");
-  const tsxBin = path.join(ROOT, "node_modules", ".bin", "tsx");
 
-  const child = spawn(tsxBin, [serverScript], {
-    cwd: ROOT,
-    env: {
-      ...process.env,
-      PORT: String(port),
-      HOST: "127.0.0.1",
-      NODE_ENV: IS_DEV ? "development" : "production",
+  // tsx 실행 — Electron의 내장 node + ELECTRON_RUN_AS_NODE로 일반 node처럼 동작
+  const tsxCli = path.join(ROOT, "node_modules", "tsx", "dist", "cli.mjs");
+  const cmd = process.execPath;
+  const args = IS_DEV
+    ? [path.join(ROOT, "node_modules", ".bin", "tsx"), serverScript]
+    : [tsxCli, serverScript];
+
+  const useExecPath = !IS_DEV;
+
+  const child = spawn(
+    IS_DEV ? args[0] : cmd,
+    IS_DEV ? [serverScript] : args,
+    {
+      cwd: ROOT,
+      env: {
+        ...process.env,
+        PORT: String(port),
+        HOST: "127.0.0.1",
+        NODE_ENV: IS_DEV ? "development" : "production",
+        ...(useExecPath ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: process.platform === "win32" && IS_DEV,
     },
-    stdio: ["ignore", "pipe", "pipe"],
-    // Windows에서 .cmd 확장자 처리
-    shell: process.platform === "win32",
-  });
+  );
 
   child.stdout?.on("data", (data: Buffer) => {
     console.log(`[server] ${data.toString().trim()}`);
