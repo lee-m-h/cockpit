@@ -3,23 +3,14 @@ name: Build & Release
 on:
   push:
     tags:
-      - "v*" # v1.0.0, v1.1.0 등 태그 push 시 빌드
+      - "v*"
 
 permissions:
   contents: write
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest
-            platform: mac
-          - os: windows-latest
-            platform: win
-
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +30,12 @@ jobs:
       - name: Build Electron
         run: pnpm tsc -p electron/tsconfig.json
 
-      - name: Package (${{ matrix.platform }})
-        run: pnpm electron-builder --${{ matrix.platform }} --publish always
+      - name: Package Mac (.dmg)
+        run: pnpm electron-builder --mac --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package Windows (.exe) — cross-build
+        run: pnpm electron-builder --win --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
