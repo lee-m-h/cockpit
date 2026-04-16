@@ -47,6 +47,30 @@ function resolveShell(requested?: string): string {
   return candidate;
 }
 
+/**
+ * PTY에 전달할 환경변수에서 Cockpit 서버 고유 변수를 제거.
+ * Claude Desktop에서 실행 시 ANTHROPIC_API_KEY(빈 값) 등이
+ * 자식 프로세스(Claude CLI)에 전달되어 인증 오류를 유발하는 문제 방지.
+ */
+function cleanEnvForPty(
+  env: NodeJS.ProcessEnv,
+): Record<string, string> {
+  const REMOVE_PREFIXES = [
+    "ANTHROPIC_",
+    "CLAUDE_CODE_",
+    "CLAUDE_AGENT_",
+    "CLAUDE_INTERNAL_",
+    "CLAUDECODE",
+  ];
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (value === undefined) continue;
+    if (REMOVE_PREFIXES.some((p) => key.startsWith(p))) continue;
+    result[key] = value;
+  }
+  return result;
+}
+
 function resolveCwd(requested?: string): string {
   const home = os.homedir();
   const candidate = requested ?? process.env.DEFAULT_CWD ?? home;
@@ -101,7 +125,7 @@ export class PtyManager {
       rows: options.rows ?? 24,
       cwd,
       env: {
-        ...process.env,
+        ...cleanEnvForPty(process.env),
         TERM: "xterm-256color",
         COLORTERM: "truecolor",
         COCKPIT_SESSION: id,
