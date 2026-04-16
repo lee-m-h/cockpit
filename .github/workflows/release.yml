@@ -6,7 +6,7 @@ on:
       - "v*" # v1.0.0, v1.1.0 등 태그 push 시 빌드
 
 permissions:
-  contents: write # GitHub Releases 생성/업로드 권한
+  contents: write
 
 jobs:
   build:
@@ -16,10 +16,8 @@ jobs:
         include:
           - os: macos-latest
             platform: mac
-            next_output: ""
           - os: windows-latest
             platform: win
-            next_output: "default"
 
     runs-on: ${{ matrix.os }}
 
@@ -37,8 +35,6 @@ jobs:
 
       - name: Build Next.js
         run: pnpm build
-        env:
-          NEXT_OUTPUT: ${{ matrix.next_output }}
 
       - name: Build Electron
         run: pnpm tsc -p electron/tsconfig.json
