@@ -42,6 +42,15 @@ if [[ "${1:-}" == "--stop" ]]; then
   exit 0
 fi
 
+# ---------- app mode (Electron) ----------
+if [[ "${1:-}" == "--app" ]]; then
+  log "데스크탑 앱 모드로 실행합니다…"
+  # Electron은 내부에서 서버를 자동 시작하므로 기존 서버 중지
+  stop_cockpit 2>/dev/null || true
+  pnpm tsc -p electron/tsconfig.json 2>/dev/null
+  exec pnpm electron .
+fi
+
 # ---------- auto update ----------
 if [[ -d ".git" ]]; then
   log "최신 버전 확인 중…"
