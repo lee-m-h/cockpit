@@ -31,6 +31,7 @@ interface TerminalState {
   /** 패인의 initialInput을 1회 사용 후 클리어. TerminalPane이 호출. */
   consumeInitialInput: (paneId: string) => string | undefined;
   closeTab: (tabId: string) => Promise<void>;
+  renameTab: (tabId: string, name: string) => void;
   setActiveTab: (tabId: string) => void;
 
   splitPane: (
@@ -218,6 +219,13 @@ export const useTerminalStore = create<TerminalState>()(
           return { tabs: remaining, activeTabId: nextActive };
         });
       },
+
+      renameTab: (tabId, name) =>
+        set((s) => ({
+          tabs: s.tabs.map((t) =>
+            t.id === tabId ? { ...t, name } : t,
+          ),
+        })),
 
       setActiveTab: (tabId) => set({ activeTabId: tabId }),
 

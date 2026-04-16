@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { useTerminalStore } from "@/store/terminal-store";
 import { useActiveProjectStore } from "@/store/active-project-store";
 import { useProjects } from "@/hooks/use-projects";
@@ -13,8 +14,10 @@ export function TerminalTabs() {
   const setActive = useTerminalStore((s) => s.setActiveTab);
   const closeTab = useTerminalStore((s) => s.closeTab);
   const createTab = useTerminalStore((s) => s.createTab);
+  const renameTab = useTerminalStore((s) => s.renameTab);
 
-  // 기본 옵션 설명용: 활성 프로젝트 이름
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+
   const activeId = useActiveProjectStore((s) => s.activeProjectId);
   const { data: projectsData } = useProjects();
   const activeProject = projectsData?.projects.find((p) => p.id === activeId);
@@ -38,7 +41,26 @@ export function TerminalTabs() {
               : "text-[var(--color-foreground-muted)]",
           )}
         >
-          <span className="truncate max-w-[160px]">{tab.name}</span>
+          {editingTabId === tab.id ? (
+            <TabNameInput
+              defaultValue={tab.name}
+              onDone={(name) => {
+                if (name.trim()) renameTab(tab.id, name.trim());
+                setEditingTabId(null);
+              }}
+            />
+          ) : (
+            <span
+              className="truncate max-w-[160px]"
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                setEditingTabId(tab.id);
+              }}
+              title="더블클릭으로 이름 변경"
+            >
+              {tab.name}
+            </span>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -55,7 +77,9 @@ export function TerminalTabs() {
         onSelect={handlePickerSelect}
         defaultLabel="기본 (활성 프로젝트)"
         defaultDescription={
-          activeProject ? `${activeProject.name} — ${activeProject.path}` : undefined
+          activeProject
+            ? `${activeProject.name} — ${activeProject.path}`
+            : undefined
         }
         align="start"
         side="bottom"
@@ -70,5 +94,31 @@ export function TerminalTabs() {
         }
       />
     </div>
+  );
+}
+
+/** 인라인 탭 이름 편집 입력 */
+function TabNameInput({
+  defaultValue,
+  onDone,
+}: {
+  defaultValue: string;
+  onDone: (name: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <input
+      ref={inputRef}
+      autoFocus
+      defaultValue={defaultValue}
+      className="w-24 px-1 py-0 text-sm bg-[var(--color-background)] border border-[var(--color-accent)] rounded outline-none text-[var(--color-foreground)]"
+      onBlur={(e) => onDone(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onDone(e.currentTarget.value);
+        if (e.key === "Escape") onDone(defaultValue);
+      }}
+      onClick={(e) => e.stopPropagation()}
+    />
   );
 }
