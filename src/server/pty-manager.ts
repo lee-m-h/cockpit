@@ -93,7 +93,9 @@ export class PtyManager {
     const shell = resolveShell(options.shell);
     const cwd = resolveCwd(options.cwd);
 
-    const pty = spawn(shell, [], {
+    // --login 플래그로 로그인 셸 실행 → .zshrc/.bash_profile 로드 (Claude CLI 인증 등)
+    const shellArgs = IS_WIN ? [] : ["--login"];
+    const pty = spawn(shell, shellArgs, {
       name: "xterm-256color",
       cols: options.cols ?? 80,
       rows: options.rows ?? 24,
