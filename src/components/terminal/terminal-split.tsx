@@ -1,9 +1,14 @@
 "use client";
 
-import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import {
+  Panel,
+  PanelGroup,
+  PanelResizeHandle,
+  type ImperativePanelGroupHandle,
+} from "react-resizable-panels";
 import type { SplitNode } from "@/types/terminal";
 import { TerminalPane } from "./terminal-pane";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 interface TerminalSplitProps {
   node: SplitNode;
@@ -13,7 +18,14 @@ interface TerminalSplitProps {
 export function TerminalSplit({ node, tabId }: TerminalSplitProps) {
   const [activePaneId, setActivePaneId] = useState<string | null>(null);
 
-  return <SplitNodeRenderer node={node} active={activePaneId} onFocus={setActivePaneId} tabId={tabId} />;
+  return (
+    <SplitNodeRenderer
+      node={node}
+      active={activePaneId}
+      onFocus={setActivePaneId}
+      tabId={tabId}
+    />
+  );
 }
 
 function SplitNodeRenderer({
@@ -37,58 +49,120 @@ function SplitNodeRenderer({
     );
   }
 
-  // split
   const isHorizontal = node.direction === "horizontal";
+  const childCount = node.children.length;
+  // 고유 ID — 하위 pane id 조합으로 충돌 방지
+  const groupId = `split-${tabId}-${node.children
+    .map((c) => (c.type === "leaf" ? c.pane.id : "g"))
+    .join("-")}`;
+
   return (
-    <PanelGroup
+    <SplitGroup
       direction={isHorizontal ? "horizontal" : "vertical"}
-      className="h-full w-full"
-      autoSaveId={`cockpit-split-${tabId}-${node.direction}`}
+      groupId={groupId}
+      childCount={childCount}
     >
       {node.children.map((child, i) => (
         <PanelItem
           key={getNodeKey(child)}
           index={i}
-          last={i === node.children.length - 1}
-          isHorizontal={isHorizontal}
+          childCount={childCount}
         >
-          <SplitNodeRenderer node={child} active={active} onFocus={onFocus} tabId={tabId} />
+          <SplitNodeRenderer
+            node={child}
+            active={active}
+            onFocus={onFocus}
+            tabId={tabId}
+          />
         </PanelItem>
       ))}
+    </SplitGroup>
+  );
+}
+
+/** PanelGroup + 더블클릭 균등 분할 */
+function SplitGroup({
+  direction,
+  groupId,
+  childCount,
+  children,
+}: {
+  direction: "horizontal" | "vertical";
+  groupId: string;
+  childCount: number;
+  children: React.ReactNode;
+}) {
+  const groupRef = useRef<ImperativePanelGroupHandle>(null);
+
+  const resetLayout = () => {
+    if (!groupRef.current) return;
+    const equalSize = 100 / childCount;
+    const layout = Array(childCount).fill(equalSize);
+    groupRef.current.setLayout(layout);
+  };
+
+  return (
+    <PanelGroup
+      ref={groupRef}
+      direction={direction}
+      className="h-full w-full"
+      autoSaveId={groupId}
+    >
+      {injectHandles(children, direction, resetLayout)}
     </PanelGroup>
   );
+}
+
+/** children 사이에 PanelResizeHandle 삽입 */
+function injectHandles(
+  children: React.ReactNode,
+  direction: "horizontal" | "vertical",
+  onDoubleClick: () => void,
+): React.ReactNode[] {
+  const items = Array.isArray(children) ? children : [children];
+  const result: React.ReactNode[] = [];
+  const isHorizontal = direction === "horizontal";
+
+  items.forEach((child, i) => {
+    if (i > 0) {
+      result.push(
+        <PanelResizeHandle
+          key={`handle-${i}`}
+          onDoubleClick={onDoubleClick}
+          className={
+            isHorizontal
+              ? "w-[3px] bg-[var(--color-border)] hover:bg-[var(--color-accent)] data-[resize-handle-state=drag]:bg-[var(--color-accent)] transition-colors cursor-col-resize"
+              : "h-[3px] bg-[var(--color-border)] hover:bg-[var(--color-accent)] data-[resize-handle-state=drag]:bg-[var(--color-accent)] transition-colors cursor-row-resize"
+          }
+          title="더블클릭으로 균등 분할"
+        />,
+      );
+    }
+    result.push(child);
+  });
+
+  return result;
 }
 
 function PanelItem({
   children,
   index,
-  last,
-  isHorizontal,
+  childCount,
 }: {
   children: React.ReactNode;
   index: number;
-  last: boolean;
-  isHorizontal: boolean;
+  childCount: number;
 }) {
   return (
-    <>
-      {index > 0 && (
-        <PanelResizeHandle
-          className={
-            isHorizontal
-              ? "w-[3px] bg-[var(--color-border)] hover:bg-[var(--color-accent)] data-[resize-handle-state=drag]:bg-[var(--color-accent)] transition-colors"
-              : "h-[3px] bg-[var(--color-border)] hover:bg-[var(--color-accent)] data-[resize-handle-state=drag]:bg-[var(--color-accent)] transition-colors"
-          }
-        />
-      )}
-      <Panel defaultSize={100 / (last ? index + 1 : 2)} minSize={15}>
-        {children}
-      </Panel>
-    </>
+    <Panel defaultSize={100 / childCount} minSize={10} order={index}>
+      {children}
+    </Panel>
   );
 }
 
 function getNodeKey(node: SplitNode): string {
   if (node.type === "leaf") return `leaf-${node.pane.id}`;
-  return `split-${node.direction}-${node.children.map(getNodeKey).join("_")}`;
+  return `split-${node.direction}-${node.children
+    .map(getNodeKey)
+    .join("_")}`;
 }
