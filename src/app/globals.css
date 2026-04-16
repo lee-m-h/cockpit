@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@theme {
+  /* Cockpit 다크 테마 기본 */
+  --color-background: #0b0d12;
+  --color-surface: #121621;
+  --color-surface-hover: #1a1f2e;
+  --color-border: #252b3a;
+  --color-border-strong: #2f3649;
+  --color-foreground: #e6e8ee;
+  --color-foreground-muted: #9ba3b4;
+  --color-foreground-dim: #6a7287;
+  --color-accent: #4f8cff;
+  --color-accent-hover: #6aa0ff;
+  --color-danger: #ef4444;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+
+  --radius-sm: 0.25rem;
+  --radius: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas,
+    monospace;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  overflow: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* xterm.js 기본 스타일 보정 */
+.xterm {
+  padding: 8px;
+  height: 100%;
+  width: 100%;
+}
+
+.xterm-viewport::-webkit-scrollbar {
+  width: 10px;
+}
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 4px;
+}
+.xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 전역 스크롤바 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-foreground-dim);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

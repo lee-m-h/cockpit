@@ -1,0 +1,74 @@
+"use client";
+
+import { useTerminalStore } from "@/store/terminal-store";
+import { useActiveProjectStore } from "@/store/active-project-store";
+import { useProjects } from "@/hooks/use-projects";
+import { Plus, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ProjectPathPicker } from "@/components/projects/project-path-picker";
+
+export function TerminalTabs() {
+  const tabs = useTerminalStore((s) => s.tabs);
+  const activeTabId = useTerminalStore((s) => s.activeTabId);
+  const setActive = useTerminalStore((s) => s.setActiveTab);
+  const closeTab = useTerminalStore((s) => s.closeTab);
+  const createTab = useTerminalStore((s) => s.createTab);
+
+  // 기본 옵션 설명용: 활성 프로젝트 이름
+  const activeId = useActiveProjectStore((s) => s.activeProjectId);
+  const { data: projectsData } = useProjects();
+  const activeProject = projectsData?.projects.find((p) => p.id === activeId);
+
+  const handlePickerSelect = (cwd: string | null) => {
+    if (cwd) void createTab({ cwd });
+    else void createTab();
+  };
+
+  return (
+    <div className="flex items-center h-9 bg-[var(--color-surface)] border-b border-[var(--color-border)] px-1 overflow-x-auto flex-shrink-0">
+      {tabs.map((tab) => (
+        <div
+          key={tab.id}
+          onClick={() => setActive(tab.id)}
+          className={cn(
+            "group flex items-center gap-2 h-full px-3 text-sm cursor-pointer border-r border-[var(--color-border)]",
+            "hover:bg-[var(--color-surface-hover)]",
+            tab.id === activeTabId
+              ? "bg-[var(--color-background)] text-[var(--color-foreground)] border-b-2 border-b-[var(--color-accent)]"
+              : "text-[var(--color-foreground-muted)]",
+          )}
+        >
+          <span className="truncate max-w-[160px]">{tab.name}</span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              closeTab(tab.id);
+            }}
+            className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-[var(--color-danger)]/20 hover:text-[var(--color-danger)] transition-opacity"
+            aria-label="탭 닫기"
+          >
+            <X size={12} />
+          </button>
+        </div>
+      ))}
+      <ProjectPathPicker
+        onSelect={handlePickerSelect}
+        defaultLabel="기본 (활성 프로젝트)"
+        defaultDescription={
+          activeProject ? `${activeProject.name} — ${activeProject.path}` : undefined
+        }
+        align="start"
+        side="bottom"
+        trigger={
+          <button
+            className="flex items-center justify-center w-8 h-full text-[var(--color-foreground-muted)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-surface-hover)]"
+            title="새 터미널 (⌘T, 클릭으로 프로젝트 선택)"
+            aria-label="새 터미널"
+          >
+            <Plus size={16} />
+          </button>
+        }
+      />
+    </div>
+  );
+}
