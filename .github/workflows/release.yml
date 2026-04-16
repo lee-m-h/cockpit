@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false # Mac/Win 독립 빌드 — 한쪽 실패해도 나머지 계속
       matrix:
         include:
           - os: macos-latest
@@ -31,6 +32,10 @@ jobs:
 
       - name: Build Next.js
         run: pnpm build
+        env:
+          # Windows standalone 빌드 시 시스템 폴더 스캔 EPERM 방지
+          USERPROFILE: ${{ runner.temp }}
+          HOME: ${{ runner.temp }}
 
       - name: Build Electron
         run: pnpm tsc -p electron/tsconfig.json

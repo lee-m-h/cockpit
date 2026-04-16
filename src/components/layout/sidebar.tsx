@@ -95,7 +95,7 @@ export function Sidebar() {
       {/* 푸터 */}
       {!collapsed && (
         <div className="p-3 border-t border-[var(--color-border)] text-[10px] text-[var(--color-foreground-dim)]">
-          v{require("../../../package.json").version}
+          v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}
         </div>
       )}
     </aside>
