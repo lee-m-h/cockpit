@@ -42,6 +42,26 @@ if [[ "${1:-}" == "--stop" ]]; then
   exit 0
 fi
 
+# ---------- auto update ----------
+if [[ -d ".git" ]]; then
+  log "최신 버전 확인 중…"
+  git fetch origin main --quiet 2>/dev/null || true
+  LOCAL=$(git rev-parse HEAD 2>/dev/null)
+  REMOTE=$(git rev-parse origin/main 2>/dev/null)
+  if [[ "$LOCAL" != "$REMOTE" ]]; then
+    log "업데이트 발견! 적용 중…"
+    git pull --ff-only origin main 2>/dev/null && {
+      log "업데이트 완료. 의존성 재설치…"
+      pnpm install --frozen-lockfile 2>/dev/null || pnpm install
+      pnpm prisma generate >/dev/null
+      pnpm prisma migrate deploy 2>/dev/null || true
+      log "업데이트 적용 완료!"
+    } || warn "자동 업데이트 실패 — 현재 버전으로 실행합니다."
+  else
+    log "최신 버전입니다."
+  fi
+fi
+
 # ---------- env check ----------
 if ! command -v node >/dev/null 2>&1; then
   err "Node.js가 설치되어 있지 않습니다. https://nodejs.org 에서 Node 20 LTS 이상을 설치하세요."
