@@ -25,12 +25,23 @@ export interface CreatePtyOptions {
   rows?: number;
 }
 
-const ALLOWED_SHELLS = new Set(["/bin/zsh", "/bin/bash", "/bin/sh"]);
+const IS_WIN = process.platform === "win32";
+
+const ALLOWED_SHELLS_UNIX = new Set(["/bin/zsh", "/bin/bash", "/bin/sh"]);
+const ALLOWED_SHELLS_WIN = new Set(["powershell.exe", "pwsh.exe", "cmd.exe"]);
 
 function resolveShell(requested?: string): string {
+  if (IS_WIN) {
+    const candidate =
+      requested ?? process.env.SHELL_PATH ?? "powershell.exe";
+    if (ALLOWED_SHELLS_WIN.has(candidate.toLowerCase().split(/[/\\]/).pop()!)) {
+      return candidate;
+    }
+    return process.env.COMSPEC ?? "cmd.exe";
+  }
   const envShell = process.env.SHELL_PATH;
   const candidate = requested ?? envShell ?? process.env.SHELL ?? "/bin/zsh";
-  if (!ALLOWED_SHELLS.has(candidate)) {
+  if (!ALLOWED_SHELLS_UNIX.has(candidate)) {
     return "/bin/zsh";
   }
   return candidate;

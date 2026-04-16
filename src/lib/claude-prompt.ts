@@ -28,15 +28,27 @@ export function buildClaudePrompt(ticket: TicketLike): string {
 }
 
 /**
- * shell에 안전하게 넘기기 위한 쌍따옴표 이스케이프 + `claude [--resume ID] "<prompt>"` 생성.
+ * shell에 안전하게 넘기기 위한 이스케이프 + `claude [--resume ID] "<prompt>"` 생성.
  * 마지막에 엔터(\r)로 끝내 pty에 바로 실행되도록 함.
+ * Windows(cmd.exe/PowerShell)와 Unix(bash/zsh) 이스케이프를 분기 처리.
  */
 export function buildClaudeCommand(prompt: string, sessionId?: string | null): string {
+  const resume = sessionId ? ` --resume ${sessionId}` : "";
+
+  if (process.platform === "win32") {
+    // PowerShell: 쌍따옴표 안의 특수문자를 backtick(`)으로 이스케이프
+    const escaped = prompt
+      .replace(/`/g, "``")
+      .replace(/"/g, '`"')
+      .replace(/\$/g, "`$");
+    return `claude${resume} "${escaped}"\r`;
+  }
+
+  // Unix (bash/zsh)
   const escaped = prompt
     .replace(/\\/g, "\\\\")
     .replace(/"/g, '\\"')
     .replace(/\$/g, "\\$")
     .replace(/`/g, "\\`");
-  const resume = sessionId ? ` --resume ${sessionId}` : "";
   return `claude${resume} "${escaped}"\r`;
 }

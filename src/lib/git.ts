@@ -52,7 +52,8 @@ export function validateHash(hash: string): string {
   return hash;
 }
 export function validateRelPath(p: string): string {
-  if (!p || p.includes("\0") || /(^|\/)\.\.(\/|$)/.test(p)) {
+  // Unix(/) 와 Windows(\) 경로 구분자 모두에서 상위 탈출 차단
+  if (!p || p.includes("\0") || /(^|[/\\])\.\\.([/\\]|$)/.test(p)) {
     throw new Error("invalid path");
   }
   return p;
