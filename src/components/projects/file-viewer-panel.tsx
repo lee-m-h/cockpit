@@ -184,7 +184,24 @@ export function FileViewerPanel({
 function MarkdownContent({ content }: { content: string }) {
   return (
     <div className="markdown-body p-6 text-sm text-[var(--color-foreground)]">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          // 외부 링크는 새 창으로 열기 (앱 자체가 이동하는 것 방지)
+          a: ({ href, children, ...props }) => (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              {...props}
+            >
+              {children}
+            </a>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }

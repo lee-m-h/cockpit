@@ -194,10 +194,19 @@ function createWindow(): void {
   // 페이지 title이 창 타이틀을 덮어쓰지 않도록 고정
   mainWindow.on("page-title-updated", (e) => e.preventDefault());
 
+  // window.open() 호출 시 외부 URL은 기본 브라우저로
   mainWindow.webContents.setWindowOpenHandler(({ url }: any) => {
     if (url.startsWith("http://127.0.0.1")) return { action: "allow" };
     shell.openExternal(url);
     return { action: "deny" };
+  });
+
+  // <a href="..."> 링크 클릭 등으로 앱이 외부 URL로 navigate하려 할 때 차단
+  mainWindow.webContents.on("will-navigate", (event: any, url: string) => {
+    if (!url.startsWith("http://127.0.0.1")) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
   });
 
   mainWindow.on("closed", () => {
