@@ -144,20 +144,33 @@ async function recreateDeadPanes(
     }
     // 터미널 pane
     if (alive.has(pane.id)) return node;
-    // 죽었으면 같은 cwd로 재생성
-    try {
-      const res = await createPty({ cwd: pane.cwd });
-      return {
-        type: "leaf",
-        pane: {
-          id: res.id,
-          cwd: res.cwd,
-          title: pane.title || shortCwd(res.cwd),
-        },
-      };
-    } catch {
-      return null;
+    // 죽었으면 같은 cwd로 재생성 (실패 시 최대 3번 재시도)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await createPty({ cwd: pane.cwd });
+        return {
+          type: "leaf",
+          pane: {
+            id: res.id,
+            cwd: res.cwd,
+            title: pane.title || shortCwd(res.cwd),
+          },
+        };
+      } catch (err) {
+        console.warn(
+          `[cockpit] PTY 재생성 실패 (attempt ${attempt + 1}, pane=${pane.id}):`,
+          err,
+        );
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+        }
+      }
     }
+    // 3번 다 실패해도 pane은 유지 (탭 레이아웃 보존)
+    console.error(
+      `[cockpit] PTY 재생성 최종 실패 — pane 유지 (id=${pane.id})`,
+    );
+    return node;
   }
   const children = await Promise.all(
     node.children.map((c) => recreateDeadPanes(c, alive)),
