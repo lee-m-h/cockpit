@@ -30,7 +30,17 @@ fi
 # ---------- pnpm 체크 ----------
 if ! command -v pnpm >/dev/null 2>&1; then
   log "pnpm 설치 중…"
-  npm install -g pnpm
+  # npm -g 는 권한 문제 가능성 → 공식 인스톨러 우선, 실패 시 npm -g fallback
+  if ! curl -fsSL https://get.pnpm.io/install.sh | sh - >/dev/null 2>&1; then
+    log "공식 인스톨러 실패 — npm -g 로 재시도"
+    npm install -g pnpm || {
+      err "pnpm 설치 실패. 권한 문제라면 'sudo npm install -g pnpm' 또는 'brew install pnpm' 으로 수동 설치 후 다시 시도하세요."
+      exit 1
+    }
+  fi
+  # PATH에 pnpm 추가 (현재 세션에도)
+  export PNPM_HOME="$HOME/.local/share/pnpm"
+  export PATH="$PNPM_HOME:$PATH"
 fi
 
 # ---------- Clone / Update ----------
