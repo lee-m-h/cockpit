@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Star, MoreHorizontal, Folder, ExternalLink, GripVertical } from "lucide-react";
 import { useDraggable } from "@dnd-kit/core";
 import {
@@ -31,6 +31,7 @@ interface Props {
 
 export function ProjectItem({ project, folders, onEdit, draggable: isDraggable }: Props) {
   const pathname = usePathname();
+  const router = useRouter();
   const isActive = pathname === `/projects/${project.id}`;
   const activeId = useActiveProjectStore((s) => s.activeProjectId);
   const setActive = useActiveProjectStore((s) => s.setActive);
@@ -53,7 +54,10 @@ export function ProjectItem({ project, folders, onEdit, draggable: isDraggable }
 
   const remove = () => {
     if (!confirm(`프로젝트 "${project.name}"을(를) 삭제할까요?`)) return;
+    // 활성 프로젝트면 먼저 해제 (useEffect에서 다른 프로젝트로 자동 전환됨)
     if (isActiveProject) setActive(null, null);
+    // 프로젝트 상세 페이지에서 삭제 중이면 목록으로 이동 (404 화면 방지)
+    if (isActive) router.push("/projects");
     deleteMut.mutate(project.id);
   };
 

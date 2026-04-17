@@ -111,7 +111,13 @@ export function useDeleteProject() {
         method: "DELETE",
         parseEmpty: true,
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: PROJECTS_KEY }),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: PROJECTS_KEY });
+      // 관련 stale 캐시 제거 — 삭제된 프로젝트에 대한 API 호출이 남지 않도록
+      qc.removeQueries({ queryKey: ["projects", id] });
+      qc.removeQueries({ queryKey: ["tickets", id] });
+      qc.removeQueries({ queryKey: ["git", id] });
+    },
   });
 }
 

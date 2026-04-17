@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useActiveProjectStore } from "@/store/active-project-store";
 import { useProjects } from "@/hooks/use-projects";
 import { KanbanBoard } from "@/components/kanban/board";
@@ -15,6 +15,13 @@ export default function KanbanPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     activeId,
   );
+
+  // 선택된 프로젝트가 삭제됐으면 활성 프로젝트로 폴백
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    const exists = projects.find((p) => p.id === selectedProjectId);
+    if (!exists) setSelectedProjectId(activeId);
+  }, [selectedProjectId, projects, activeId]);
 
   const handleProjectChange = (id: string | null) => {
     setSelectedProjectId(id);
