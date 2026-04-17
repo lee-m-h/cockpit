@@ -8,6 +8,7 @@ import {
   Globe,
   ExternalLink,
   AlertTriangle,
+  Wrench,
 } from "lucide-react";
 import { useTerminalStore } from "@/store/terminal-store";
 
@@ -151,6 +152,21 @@ export function BrowserContent({ paneId, initialUrl }: Props) {
     window.open(currentUrl, "_blank", "noopener");
   };
 
+  const openDevTools = () => {
+    if (!IS_ELECTRON || !webviewRef.current) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const wv = webviewRef.current as any;
+    try {
+      if (wv.isDevToolsOpened?.()) {
+        wv.closeDevTools();
+      } else {
+        wv.openDevTools();
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     go(input);
@@ -200,6 +216,15 @@ export function BrowserContent({ paneId, initialUrl }: Props) {
         >
           <ExternalLink size={14} />
         </button>
+        {IS_ELECTRON && (
+          <button
+            onClick={openDevTools}
+            className="p-1 rounded text-[var(--color-foreground-dim)] hover:bg-[var(--color-surface-hover)]"
+            title="개발자 도구 (토글)"
+          >
+            <Wrench size={14} />
+          </button>
+        )}
       </div>
 
       {/* 본체 — Electron은 <webview>, 웹은 iframe */}
