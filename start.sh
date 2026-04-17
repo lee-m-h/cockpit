@@ -44,6 +44,7 @@ if [[ "${1:-}" == "--stop" ]]; then
 fi
 
 # ---------- auto update ----------
+UPDATE_APPLIED=0
 if [[ -d ".git" ]]; then
   log "최신 버전 확인 중…"
   git fetch origin main --quiet 2>/dev/null || true
@@ -57,6 +58,7 @@ if [[ -d ".git" ]]; then
       pnpm prisma generate >/dev/null
       pnpm prisma migrate deploy 2>/dev/null || true
       log "업데이트 적용 완료!"
+      UPDATE_APPLIED=1
     } || warn "자동 업데이트 실패 — 현재 버전으로 실행합니다."
   else
     log "최신 버전입니다."
@@ -84,8 +86,15 @@ fi
 if [[ -f "$PID_FILE" ]]; then
   existing_pid=$(cat "$PID_FILE")
   if kill -0 "$existing_pid" 2>/dev/null; then
-    log "Cockpit이 이미 실행 중입니다 (pid=$existing_pid)."
-    exit 0
+    if [[ "$UPDATE_APPLIED" == "1" ]]; then
+      log "업데이트가 적용되었습니다. 기존 프로세스를 재시작합니다…"
+      stop_cockpit
+      # stop 후 약간 대기
+      sleep 1
+    else
+      log "Cockpit이 이미 실행 중입니다 (pid=$existing_pid)."
+      exit 0
+    fi
   else
     rm -f "$PID_FILE"
   fi
