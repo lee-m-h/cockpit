@@ -81,22 +81,58 @@ function isPortFree(port: number): Promise<boolean> {
 }
 
 /**
- * preferred 포트가 풀릴 때까지 최대 maxWaitMs 대기.
- * 끝까지 안 풀리면 OS가 할당한 빈 포트 반환.
- *
- * 중요: 동일한 origin(포트)을 유지해야 localStorage가 보존되므로
- * 이전 프로세스가 정리 중이라면 최대 10초까지 기다림.
+ * 이전에 사용했던 포트를 파일에 저장 — 재시작 시 같은 포트를 재사용하기 위함.
+ * 포트가 바뀌면 localStorage origin이 바뀌어 데이터가 유실됨.
+ */
+const PORT_FILE = path.join(COCKPIT_USER_DATA, "last-port");
+
+function readSavedPort(): number | null {
+  try {
+    const txt = fs.readFileSync(PORT_FILE, "utf8").trim();
+    const n = Number(txt);
+    if (Number.isFinite(n) && n > 1024 && n < 65536) return n;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function writeSavedPort(port: number): void {
+  try {
+    fs.writeFileSync(PORT_FILE, String(port));
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * 포트 선택 우선순위:
+ * 1. 저장된 이전 포트 (빈 경우)
+ * 2. preferred 포트가 최대 10초 내 풀리면 사용
+ * 3. 4001~4020 순차 시도
+ * 4. OS 할당 빈 포트
  */
 async function findFreePort(
   preferred: number,
   maxWaitMs = 10_000,
 ): Promise<number> {
+  // 1. 이전 포트 재사용
+  const saved = readSavedPort();
+  if (saved && (await isPortFree(saved))) return saved;
+
+  // 2. preferred 포트 대기
   const start = Date.now();
   while (Date.now() - start < maxWaitMs) {
     if (await isPortFree(preferred)) return preferred;
     await new Promise((r) => setTimeout(r, 500));
   }
-  // fallback: OS가 빈 포트 할당
+
+  // 3. 4001~4020 순차 시도 → 범위 내에서 적어도 하나는 안정적으로 잡기
+  for (let p = preferred + 1; p <= preferred + 20; p++) {
+    if (await isPortFree(p)) return p;
+  }
+
+  // 4. OS 할당
   return new Promise((resolve) => {
     const srv = net.createServer();
     srv.listen(0, "127.0.0.1", () => {
@@ -289,8 +325,9 @@ function createWindow(): void {
 app.whenReady().then(async () => {
   buildMenu();
 
-  // 빈 포트 먼저 확보 (4000이 점유되어 있으면 자동으로 다른 포트)
+  // 빈 포트 먼저 확보 — 저장된 포트 우선, 4000 대기, 4001~4020 시도
   PORT = await findFreePort(4000);
+  writeSavedPort(PORT);
   console.log(`[cockpit] 포트 선택: ${PORT}`);
 
   startServer();
