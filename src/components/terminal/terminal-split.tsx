@@ -8,6 +8,7 @@ import {
 } from "react-resizable-panels";
 import type { SplitNode } from "@/types/terminal";
 import { TerminalPane } from "./terminal-pane";
+import { BrowserSplitPane } from "./browser-split-pane";
 import { useRef, useState } from "react";
 
 interface TerminalSplitProps {
@@ -40,6 +41,15 @@ function SplitNodeRenderer({
   tabId: string;
 }) {
   if (node.type === "leaf") {
+    if (node.pane.type === "browser") {
+      return (
+        <BrowserSplitPane
+          pane={node.pane}
+          isActive={active === node.pane.id}
+          onFocus={() => onFocus(node.pane.id)}
+        />
+      );
+    }
     return (
       <TerminalPane
         pane={node.pane}

@@ -36,13 +36,13 @@ interface TerminalState {
 
   /** 브라우저 탭 생성 (URL은 선택) */
   createBrowserTab: (url?: string, tabName?: string) => string;
-  /** 브라우저 탭 URL 갱신 */
-  setBrowserUrl: (tabId: string, url: string) => void;
+  /** 브라우저 URL 갱신 (탭 또는 분할 내 브라우저 pane) */
+  setBrowserUrl: (id: string, url: string) => void;
 
   splitPane: (
     paneId: string,
     direction: SplitDirection,
-    opts?: { cwd?: string },
+    opts?: { cwd?: string; type?: "terminal" | "browser"; url?: string },
   ) => Promise<void>;
   closePane: (paneId: string) => Promise<void>;
 
@@ -163,6 +163,24 @@ function addToSplitOrReplace(
     children: node.children.map((c) =>
       addToSplitOrReplace(c, targetPaneId, direction, newPane),
     ),
+  };
+}
+
+/** split 트리 내의 특정 browser pane의 url 갱신 */
+function updateBrowserPaneUrl(
+  node: SplitNode,
+  paneId: string,
+  url: string,
+): SplitNode {
+  if (node.type === "leaf") {
+    if (node.pane.id === paneId && node.pane.type === "browser") {
+      return { type: "leaf", pane: { ...node.pane, url } };
+    }
+    return node;
+  }
+  return {
+    ...node,
+    children: node.children.map((c) => updateBrowserPaneUrl(c, paneId, url)),
   };
 }
 
@@ -313,11 +331,16 @@ export const useTerminalStore = create<TerminalState>()(
         return tabId;
       },
 
-      setBrowserUrl: (tabId, url) =>
+      setBrowserUrl: (id, url) =>
         set((s) => ({
-          tabs: s.tabs.map((t) =>
-            t.id === tabId ? { ...t, url } : t,
-          ),
+          tabs: s.tabs.map((t) => {
+            // 탭 자체가 브라우저 탭이면 tab.url 갱신
+            if (t.id === id && t.type === "browser") {
+              return { ...t, url };
+            }
+            // 아니면 split 트리 내의 browser pane 찾아서 갱신
+            return { ...t, root: updateBrowserPaneUrl(t.root, id, url) };
+          }),
         })),
 
       splitPane: async (paneId, direction, opts) => {
@@ -326,13 +349,26 @@ export const useTerminalStore = create<TerminalState>()(
         );
         if (!tab) return;
         const currentPane = findAllPanes(tab.root).find((p) => p.id === paneId);
-        // opts.cwd가 명시되면 그 경로, 아니면 현재 패널 cwd를 기본으로 사용.
-        const res = await createPty({ cwd: opts?.cwd ?? currentPane?.cwd });
-        const newPane: TerminalPane = {
-          id: res.id,
-          cwd: res.cwd,
-          title: shortCwd(res.cwd),
-        };
+
+        let newPane: TerminalPane;
+        if (opts?.type === "browser") {
+          // 브라우저 pane — pty 생성 안 함
+          newPane = {
+            id: `browser-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            cwd: "",
+            title: "브라우저",
+            type: "browser",
+            url: opts.url ?? "",
+          };
+        } else {
+          // opts.cwd가 명시되면 그 경로, 아니면 현재 패널 cwd를 기본으로 사용.
+          const res = await createPty({ cwd: opts?.cwd ?? currentPane?.cwd });
+          newPane = {
+            id: res.id,
+            cwd: res.cwd,
+            title: shortCwd(res.cwd),
+          };
+        }
 
         set((s) => ({
           tabs: s.tabs.map((t) => {
@@ -350,7 +386,10 @@ export const useTerminalStore = create<TerminalState>()(
       },
 
       closePane: async (paneId) => {
-        await deletePty(paneId);
+        // 브라우저 pane은 pty 없음
+        if (!paneId.startsWith("browser-")) {
+          await deletePty(paneId);
+        }
         set((s) => {
           const updated: TerminalTab[] = [];
           let activeTabId = s.activeTabId;

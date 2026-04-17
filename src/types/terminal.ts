@@ -4,7 +4,7 @@
  */
 
 export interface TerminalPane {
-  id: string; // 서버 pty id와 동일
+  id: string; // 터미널이면 서버 pty id와 동일, 브라우저면 클라이언트 생성 uuid
   cwd: string;
   title: string;
   /**
@@ -12,6 +12,10 @@ export interface TerminalPane {
    * 주입 후에는 store에서 null로 지워진다 (재연결 시 중복 주입 방지).
    */
   initialInput?: string | null;
+  /** pane 종류 — "terminal"(기본) 또는 "browser" */
+  type?: "terminal" | "browser";
+  /** browser pane 전용 URL */
+  url?: string;
 }
 
 export type SplitDirection = "horizontal" | "vertical";

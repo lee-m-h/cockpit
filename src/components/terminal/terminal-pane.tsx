@@ -6,7 +6,12 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 import { PtyWsClient } from "@/lib/ws-client";
-import { SplitSquareHorizontal, SplitSquareVertical, X } from "lucide-react";
+import {
+  SplitSquareHorizontal,
+  SplitSquareVertical,
+  X,
+  Globe,
+} from "lucide-react";
 import { useTerminalStore } from "@/store/terminal-store";
 import type { TerminalPane as TerminalPaneType } from "@/types/terminal";
 import { ProjectPathPicker } from "@/components/projects/project-path-picker";
@@ -207,6 +212,17 @@ export function TerminalPane({ pane, isActive, onFocus }: TerminalPaneProps) {
               </button>
             }
           />
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              splitPane(pane.id, "horizontal", { type: "browser" });
+            }}
+            className="p-1 rounded hover:bg-[var(--color-surface-hover)]"
+            title="오른쪽에 브라우저 분할"
+            aria-label="오른쪽에 브라우저 분할"
+          >
+            <Globe size={12} />
+          </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
