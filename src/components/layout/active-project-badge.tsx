@@ -12,8 +12,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { ChevronUp, Star, Plane } from "lucide-react";
+import { ChevronUp, Star, Plane, Folder } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Project } from "@/types/project";
 
 interface Props {
   collapsed: boolean;
@@ -90,7 +91,7 @@ export function ActiveProjectBadge({ collapsed }: Props) {
         <DropdownMenuContent
           align={collapsed ? "start" : "end"}
           side="top"
-          className="w-64"
+          className="w-64 max-h-[70vh] overflow-y-auto"
         >
           <DropdownMenuRadioGroup
             value={activeId ?? ""}
@@ -99,24 +100,68 @@ export function ActiveProjectBadge({ collapsed }: Props) {
               if (p) setActive(p.id, p.path);
             }}
           >
-            {data.projects
-              .slice()
-              .sort((a, b) => {
-                if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
-                return a.name.localeCompare(b.name);
-              })
-              .map((p) => (
-                <DropdownMenuRadioItem key={p.id} value={p.id}>
-                  {p.isFavorite && (
-                    <Star
-                      size={10}
-                      className="text-[var(--color-warning)]"
-                      fill="currentColor"
-                    />
-                  )}
-                  <span className="truncate">{p.name}</span>
-                </DropdownMenuRadioItem>
-              ))}
+            {/* 즐겨찾기 */}
+            {(() => {
+              const favs = data.projects.filter((p) => p.isFavorite);
+              if (favs.length === 0) return null;
+              return (
+                <>
+                  <GroupLabel
+                    icon={
+                      <Star
+                        size={10}
+                        className="text-[var(--color-warning)]"
+                        fill="currentColor"
+                      />
+                    }
+                    label="Favorites"
+                  />
+                  {favs
+                    .slice()
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((p) => (
+                      <ProjectRadioItem key={`fav-${p.id}`} project={p} />
+                    ))}
+                </>
+              );
+            })()}
+
+            {/* 폴더별 그룹 */}
+            {data.folders.map((f) => {
+              const projs = data.projects.filter((p) => p.folderId === f.id);
+              if (projs.length === 0) return null;
+              return (
+                <div key={f.id}>
+                  <GroupLabel
+                    icon={<Folder size={10} />}
+                    label={f.name}
+                  />
+                  {projs
+                    .slice()
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((p) => (
+                      <ProjectRadioItem key={p.id} project={p} />
+                    ))}
+                </div>
+              );
+            })}
+
+            {/* 미분류 */}
+            {(() => {
+              const unfiled = data.projects.filter((p) => !p.folderId);
+              if (unfiled.length === 0) return null;
+              return (
+                <>
+                  <GroupLabel label="Unfiled" />
+                  {unfiled
+                    .slice()
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((p) => (
+                      <ProjectRadioItem key={p.id} project={p} />
+                    ))}
+                </>
+              );
+            })()}
           </DropdownMenuRadioGroup>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => setActive(null, null)}>
@@ -125,5 +170,35 @@ export function ActiveProjectBadge({ collapsed }: Props) {
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
+  );
+}
+
+function GroupLabel({
+  icon,
+  label,
+}: {
+  icon?: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center gap-1 px-2 pt-2 pb-1 text-[10px] uppercase tracking-wider text-[var(--color-foreground-muted)]">
+      {icon}
+      {label}
+    </div>
+  );
+}
+
+function ProjectRadioItem({ project }: { project: Project }) {
+  return (
+    <DropdownMenuRadioItem value={project.id}>
+      {project.isFavorite && (
+        <Star
+          size={10}
+          className="text-[var(--color-warning)]"
+          fill="currentColor"
+        />
+      )}
+      <span className="truncate">{project.name}</span>
+    </DropdownMenuRadioItem>
   );
 }
