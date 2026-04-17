@@ -204,7 +204,25 @@ export function CommitGraph({ projectId, selectedHash, onSelect }: Props) {
         </div>
       )}
 
-      {/* SVG + 커밋 리스트가 flex side-by-side (git-pilot 동일) */}
+      {/* 컬럼 헤더 — IntelliJ 스타일 */}
+      {commits.length > 0 && (
+        <div
+          className="sticky top-[30px] z-10 flex items-center px-2 h-7 bg-[var(--color-surface)]/60 border-b border-[var(--color-border)] text-[10px] uppercase tracking-wider text-[var(--color-foreground-dim)]"
+          style={{ minWidth: "max-content" }}
+        >
+          <div style={{ width: graphWidth }} className="flex-shrink-0">
+            Graph
+          </div>
+          <div className="flex-1 min-w-[200px] px-2">Subject</div>
+          <div className="w-[110px] flex-shrink-0 px-2 truncate">Author</div>
+          <div className="w-[60px] flex-shrink-0 px-2 text-right">Date</div>
+          <div className="w-[70px] flex-shrink-0 px-2 font-mono text-right">
+            Hash
+          </div>
+        </div>
+      )}
+
+      {/* SVG + 커밋 리스트 */}
       {commits.length > 0 && (
         <div className="flex min-w-max" style={{ paddingTop: TOP_GUTTER }}>
           <svg
@@ -213,6 +231,7 @@ export function CommitGraph({ projectId, selectedHash, onSelect }: Props) {
             className="flex-shrink-0"
           >
             {edges.map((edge, i) => {
+              // 같은 레인: 수직선
               if (edge.x1 === edge.x2) {
                 return (
                   <line
@@ -226,28 +245,23 @@ export function CommitGraph({ projectId, selectedHash, onSelect }: Props) {
                   />
                 );
               }
-              const r = 4;
-              const goingRight = edge.x2 > edge.x1;
-              if (goingRight) {
-                // 머지: ㄱ자 - 수평 먼저, 그 다음 수직
-                return (
-                  <path
-                    key={i}
-                    d={`M ${edge.x1} ${edge.y1} L ${edge.x2 - r} ${edge.y1} Q ${edge.x2} ${edge.y1}, ${edge.x2} ${edge.y1 + r} L ${edge.x2} ${edge.y2}`}
-                    stroke={edge.color}
-                    strokeWidth={2}
-                    fill="none"
-                  />
-                );
-              }
-              // 분기: ㄴ자 - 수직 먼저, 그 다음 수평
+              // 다른 레인: IntelliJ 스타일 — 한 행 내에서 대각선, 그 이후는 수직
+              // 자식 y1 → 자식 y1 + ROW_HEIGHT (한 행 아래) 까지 대각선
+              // 그 다음은 parent 레인에서 수직으로 parent y2 까지
+              const diagonalEndY = edge.y1 + ROW_HEIGHT;
+              const needsVertical = diagonalEndY < edge.y2;
               return (
                 <path
                   key={i}
-                  d={`M ${edge.x1} ${edge.y1} L ${edge.x1} ${edge.y2 - r} Q ${edge.x1} ${edge.y2}, ${edge.x1 - r} ${edge.y2} L ${edge.x2} ${edge.y2}`}
+                  d={
+                    needsVertical
+                      ? `M ${edge.x1} ${edge.y1} L ${edge.x2} ${diagonalEndY} L ${edge.x2} ${edge.y2}`
+                      : `M ${edge.x1} ${edge.y1} L ${edge.x2} ${edge.y2}`
+                  }
                   stroke={edge.color}
                   strokeWidth={2}
                   fill="none"
+                  strokeLinejoin="round"
                 />
               );
             })}
@@ -268,64 +282,84 @@ export function CommitGraph({ projectId, selectedHash, onSelect }: Props) {
           </svg>
 
           <div className="flex-1 min-w-0">
-            {commits.map((c) => {
+            {commits.map((c, i) => {
               const active = selectedHash === c.hash;
+              const laneColor = nodes[i]?.color;
               return (
                 <button
                   key={c.hash}
                   onClick={() => onSelect(c.hash)}
                   style={{ height: ROW_HEIGHT }}
                   className={cn(
-                    "flex items-center gap-2 w-full text-left px-2 text-xs",
+                    "flex items-center w-full text-left text-xs border-b border-[var(--color-border)]/30",
                     "hover:bg-[var(--color-surface-hover)]",
                     active && "bg-[var(--color-accent)]/15",
                   )}
                 >
-                  {c.isHead && (
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--color-accent)] text-white flex-shrink-0">
-                      HEAD
-                    </span>
-                  )}
-                  {c.branches.slice(0, 2).map((b) => (
-                    <span
-                      key={`b-${b}`}
-                      className="text-[10px] px-1.5 rounded bg-[var(--color-accent)]/15 text-[var(--color-accent)] font-mono flex-shrink-0 truncate max-w-[100px]"
-                      title={b}
-                    >
-                      {b}
-                    </span>
-                  ))}
-                  {c.branches.length > 2 && (
-                    <span className="text-[10px] text-[var(--color-foreground-dim)] flex-shrink-0">
-                      +{c.branches.length - 2}
-                    </span>
-                  )}
-                  {c.tags.slice(0, 1).map((t) => (
-                    <span
-                      key={`t-${t}`}
-                      className="text-[10px] px-1.5 rounded bg-[var(--color-warning)]/15 text-[var(--color-warning)] font-mono flex-shrink-0"
-                      title={t}
-                    >
-                      🏷 {t}
-                    </span>
-                  ))}
-                  <span className="font-mono text-[10px] text-[var(--color-foreground-dim)] flex-shrink-0">
-                    {c.shortHash}
-                  </span>
-                  <span
-                    className={cn(
-                      "flex-1 min-w-0 truncate",
-                      active && "text-[var(--color-accent)]",
+                  {/* Subject 컬럼 — HEAD/브랜치/태그 뱃지 + 메시지 */}
+                  <div className="flex-1 min-w-[200px] flex items-center gap-1.5 px-2 min-w-0">
+                    {c.isHead && (
+                      <span
+                        className="px-1.5 py-0.5 rounded text-[10px] font-semibold text-white flex-shrink-0"
+                        style={{ backgroundColor: laneColor }}
+                      >
+                        HEAD
+                      </span>
                     )}
-                  >
-                    {c.message}
-                  </span>
-                  <span className="text-[10px] text-[var(--color-foreground-dim)] flex-shrink-0 truncate max-w-[100px]">
+                    {c.branches.slice(0, 2).map((b) => (
+                      <span
+                        key={`b-${b}`}
+                        className="text-[10px] px-1.5 rounded font-mono flex-shrink-0 truncate max-w-[120px] border"
+                        style={{
+                          color: laneColor,
+                          borderColor: `${laneColor}60`,
+                          backgroundColor: `${laneColor}15`,
+                        }}
+                        title={b}
+                      >
+                        {b}
+                      </span>
+                    ))}
+                    {c.branches.length > 2 && (
+                      <span className="text-[10px] text-[var(--color-foreground-dim)] flex-shrink-0">
+                        +{c.branches.length - 2}
+                      </span>
+                    )}
+                    {c.tags.slice(0, 1).map((t) => (
+                      <span
+                        key={`t-${t}`}
+                        className="text-[10px] px-1.5 rounded bg-[var(--color-warning)]/15 text-[var(--color-warning)] font-mono flex-shrink-0"
+                        title={t}
+                      >
+                        🏷 {t}
+                      </span>
+                    ))}
+                    <span
+                      className={cn(
+                        "flex-1 min-w-0 truncate",
+                        active
+                          ? "text-[var(--color-accent)] font-medium"
+                          : "text-[var(--color-foreground)]",
+                      )}
+                    >
+                      {c.message}
+                    </span>
+                  </div>
+
+                  {/* Author */}
+                  <div className="w-[110px] flex-shrink-0 px-2 truncate text-[10px] text-[var(--color-foreground-muted)]">
                     {c.author}
-                  </span>
-                  <span className="text-[10px] text-[var(--color-foreground-dim)] flex-shrink-0">
+                  </div>
+
+                  {/* Date */}
+                  <div className="w-[60px] flex-shrink-0 px-2 text-right text-[10px] text-[var(--color-foreground-dim)]">
                     {c.date}
-                  </span>
+                  </div>
+
+                  {/* Hash */}
+                  <div className="w-[70px] flex-shrink-0 px-2 font-mono text-right text-[10px] text-[var(--color-foreground-dim)]">
+                    {c.shortHash}
+                  </div>
                 </button>
               );
             })}
