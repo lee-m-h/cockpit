@@ -129,6 +129,45 @@ function removeLeaf(node: SplitNode, targetPaneId: string): SplitNode | null {
   return { ...node, children };
 }
 
+/**
+ * 죽은 터미널 pane을 같은 cwd로 새 PTY를 만들어 교체.
+ * browser/file pane은 그대로. 모두 제거되면 null.
+ */
+async function recreateDeadPanes(
+  node: SplitNode,
+  alive: Set<string>,
+): Promise<SplitNode | null> {
+  if (node.type === "leaf") {
+    const { pane } = node;
+    if (pane.type === "browser" || pane.type === "file") {
+      return node;
+    }
+    // 터미널 pane
+    if (alive.has(pane.id)) return node;
+    // 죽었으면 같은 cwd로 재생성
+    try {
+      const res = await createPty({ cwd: pane.cwd });
+      return {
+        type: "leaf",
+        pane: {
+          id: res.id,
+          cwd: res.cwd,
+          title: pane.title || shortCwd(res.cwd),
+        },
+      };
+    } catch {
+      return null;
+    }
+  }
+  const children = await Promise.all(
+    node.children.map((c) => recreateDeadPanes(c, alive)),
+  );
+  const valid = children.filter((c): c is SplitNode => c !== null);
+  if (valid.length === 0) return null;
+  if (valid.length === 1) return valid[0];
+  return { ...node, children: valid };
+}
+
 /** split tree에서 alive set에 없는 leaf를 제거한 새 트리를 반환. 모두 제거되면 null. */
 function prunePanes(node: SplitNode, alive: Set<string>): SplitNode | null {
   if (node.type === "leaf") {
@@ -632,24 +671,26 @@ export const useTerminalStore = create<TerminalState>()(
             terminals: Array<{ id: string }>;
           };
           const alive = new Set(data.terminals.map((t) => t.id));
-          set((s) => {
-            const filtered: TerminalTab[] = [];
-            for (const t of s.tabs) {
-              // 브라우저/파일 탭은 pty와 무관하므로 그대로 유지
-              if (t.type === "browser" || t.type === "file") {
-                filtered.push(t);
-                continue;
-              }
-              const pruned = prunePanes(t.root, alive);
-              if (pruned) filtered.push({ ...t, root: pruned });
+
+          // 죽은 터미널 pane은 같은 cwd로 새 PTY 생성 → 앱 재시작 후 레이아웃 유지
+          const updatedTabs: TerminalTab[] = [];
+          for (const t of get().tabs) {
+            if (t.type === "browser" || t.type === "file") {
+              updatedTabs.push(t);
+              continue;
             }
+            const newRoot = await recreateDeadPanes(t.root, alive);
+            if (newRoot) updatedTabs.push({ ...t, root: newRoot });
+          }
+
+          set((s) => {
             const activeStillAlive =
-              s.activeTabId && filtered.some((t) => t.id === s.activeTabId);
+              s.activeTabId && updatedTabs.some((t) => t.id === s.activeTabId);
             return {
-              tabs: filtered,
+              tabs: updatedTabs,
               activeTabId: activeStillAlive
                 ? s.activeTabId
-                : (filtered[0]?.id ?? null),
+                : (updatedTabs[0]?.id ?? null),
             };
           });
         } catch {

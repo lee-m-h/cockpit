@@ -74,10 +74,26 @@ body {
 
 body {
   overflow: hidden;
+  /* 전역: UI 요소 드래그/더블클릭 시 원치 않는 선택 방지 */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* 내용물은 선택 가능해야 함 — input/textarea, 터미널, 마크다운, 파일 뷰어, diff 등 */
+input,
+textarea,
+[contenteditable="true"],
+.xterm,
+.markdown-body,
+.select-text,
+pre,
+code {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* xterm.js 기본 스타일 보정 */
