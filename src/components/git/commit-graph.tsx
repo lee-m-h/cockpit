@@ -33,10 +33,10 @@ const COLORS = [
 ];
 
 /**
- * git-pilot의 layout 알고리즘을 그대로 포팅:
- * - lanes[i]: i번째 커밋의 레인 번호
- * - laneOccupied[l]: 레인 l이 현재 사용 중인지
- * - laneExpects[l]: 레인 l이 기다리는 다음 커밋 해시
+ * 컴팩트한 레인 배치:
+ * - first parent는 같은 레인 유지
+ * - secondary parent는 **미리 예약하지 않음** — 실제로 커밋을 만날 때 빈 레인에 배정
+ * - 덕분에 여러 feature 브랜치가 모두 같은 lane 1을 순차로 재사용
  */
 function layoutCommits(commits: GraphCommit[]) {
   const hashToIndex = new Map<string, number>();
@@ -46,13 +46,23 @@ function layoutCommits(commits: GraphCommit[]) {
   const laneOccupied: boolean[] = [];
   const laneExpects: (string | null)[] = [];
 
+  // 각 커밋의 부모 중 "이미 예약된 레인이 있는지" 미리 맵으로 빠르게 참조
+  const childrenOf = new Map<string, string[]>();
+  for (const c of commits) {
+    for (const p of c.parents) {
+      const arr = childrenOf.get(p) ?? [];
+      arr.push(c.hash);
+      childrenOf.set(p, arr);
+    }
+  }
+
   for (let i = 0; i < commits.length; i++) {
     const commit = commits[i];
 
-    // 이 hash를 기다리던 레인이 있으면 거기에 배정
+    // 1. 이 hash를 기다리던 레인이 있으면 거기에 배정 (first parent 체인)
     let assignedLane = laneExpects.indexOf(commit.hash);
     if (assignedLane === -1) {
-      // 없으면 빈 레인
+      // 없으면 가장 왼쪽 빈 레인
       assignedLane = laneOccupied.findIndex((o) => !o);
       if (assignedLane === -1) assignedLane = laneOccupied.length;
     }
@@ -61,27 +71,24 @@ function layoutCommits(commits: GraphCommit[]) {
     laneOccupied[assignedLane] = true;
     laneExpects[assignedLane] = null;
 
-    if (commit.parents.length > 0) {
-      // first parent는 같은 레인 유지
-      laneExpects[assignedLane] = commit.parents[0];
-
-      // 추가 parents는 새 레인
-      for (let p = 1; p < commit.parents.length; p++) {
-        const parentHash = commit.parents[p];
-        if (!laneExpects.includes(parentHash)) {
-          let parentLane = laneOccupied.findIndex(
-            (o, idx) => !o && idx !== assignedLane,
-          );
-          if (parentLane === -1) parentLane = laneOccupied.length;
-          laneOccupied[parentLane] = true;
-          laneExpects[parentLane] = parentHash;
-        }
+    // 2. 이 커밋이 다른 레인에서도 기다려지고 있었다면 해제
+    //    (merge 시 두 레인이 같은 조상을 기다리는 경우)
+    for (let l = 0; l < laneExpects.length; l++) {
+      if (l !== assignedLane && laneExpects[l] === commit.hash) {
+        laneOccupied[l] = false;
+        laneExpects[l] = null;
       }
+    }
+
+    // 3. first parent는 같은 레인에서 계속
+    if (commit.parents.length > 0) {
+      laneExpects[assignedLane] = commit.parents[0];
+      // secondary parents는 예약하지 않음 — 실제 만날 때 배정
     } else {
       laneOccupied[assignedLane] = false;
     }
 
-    // 더 이상 올 자식이 없는 레인 닫기
+    // 4. 다음 이터레이션에서 찾을 일 없는 레인 닫기
     const remaining = commits.slice(i + 1);
     for (let lane = 0; lane < laneExpects.length; lane++) {
       const expected = laneExpects[lane];
