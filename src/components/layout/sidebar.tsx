@@ -20,15 +20,21 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string; size?: number }>;
+  shortcut: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/projects", label: "Projects", icon: FolderKanban },
-  { href: "/terminal", label: "Terminal", icon: TerminalIcon },
-  { href: "/kanban", label: "Kanban", icon: KanbanSquare },
-  { href: "/git", label: "Git", icon: GitBranch },
-  { href: "/settings", label: "Settings", icon: SettingsIcon },
+  { href: "/projects", label: "Projects", icon: FolderKanban, shortcut: "1" },
+  { href: "/terminal", label: "Terminal", icon: TerminalIcon, shortcut: "2" },
+  { href: "/kanban", label: "Kanban", icon: KanbanSquare, shortcut: "3" },
+  { href: "/git", label: "Git", icon: GitBranch, shortcut: "4" },
+  { href: "/settings", label: "Settings", icon: SettingsIcon, shortcut: "5" },
 ];
+
+const IS_MAC =
+  typeof navigator !== "undefined" &&
+  navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+const MOD_KEY = IS_MAC ? "⌘" : "Ctrl";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -80,10 +86,22 @@ export function Sidebar() {
                   : "text-[var(--color-foreground-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-foreground)]",
                 collapsed && "justify-center px-0",
               )}
-              title={collapsed ? item.label : undefined}
+              title={
+                collapsed
+                  ? `${item.label} (${MOD_KEY}+${item.shortcut})`
+                  : undefined
+              }
             >
               <Icon size={18} className="flex-shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
+              {!collapsed && (
+                <>
+                  <span className="flex-1">{item.label}</span>
+                  <kbd className="text-[10px] text-[var(--color-foreground-dim)] font-mono">
+                    {MOD_KEY}
+                    {item.shortcut}
+                  </kbd>
+                </>
+              )}
             </Link>
           );
         })}

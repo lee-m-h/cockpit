@@ -1,6 +1,7 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Sidebar } from "./sidebar";
 import { cn } from "@/lib/utils";
@@ -14,9 +15,43 @@ const TerminalWorkspace = dynamic(
   { ssr: false },
 );
 
+/** ⌘+숫자 단축키 매핑 */
+const NAV_SHORTCUTS: Record<string, string> = {
+  "1": "/projects",
+  "2": "/terminal",
+  "3": "/kanban",
+  "4": "/git",
+  "5": "/settings",
+};
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const onTerminal = pathname === "/terminal";
+
+  // ⌘+1~5 단축키로 탭 전환 (Mac: Cmd, Windows/Linux: Ctrl)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.shiftKey || e.altKey) return;
+      const target = NAV_SHORTCUTS[e.key];
+      if (!target) return;
+      // input/textarea/contenteditable에서는 무시
+      const el = e.target as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      router.push(target);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [router]);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[var(--color-background)] text-[var(--color-foreground)]">
