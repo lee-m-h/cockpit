@@ -9,6 +9,7 @@ import * as net from "net";
 app.setName("Cockpit");
 
 
+
 const ROOT = path.resolve(__dirname, "..");
 
 let mainWindow: BrowserWindow | null = null;

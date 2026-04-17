@@ -44,6 +44,9 @@ interface TerminalState {
   /** 파일 뷰어 경로 갱신 */
   setFilePath: (id: string, filePath: string) => void;
 
+  /** 탭 복제 — 동일한 type/url/cwd로 새 탭 생성 */
+  duplicateTab: (tabId: string) => Promise<string | null>;
+
   splitPane: (
     paneId: string,
     direction: SplitDirection,
@@ -399,6 +402,21 @@ export const useTerminalStore = create<TerminalState>()(
             root: updateFilePanePath(t.root, id, filePath),
           })),
         })),
+
+      duplicateTab: async (tabId) => {
+        const tab = get().tabs.find((t) => t.id === tabId);
+        if (!tab) return null;
+        if (tab.type === "browser") {
+          return get().createBrowserTab(tab.url, tab.name);
+        }
+        if (tab.type === "file") {
+          return get().createFileTab(tab.url, tab.name);
+        }
+        // 터미널 탭 — 첫 pane의 cwd로 새 터미널 생성
+        const firstPane = findAllPanes(tab.root)[0];
+        const cwd = firstPane?.cwd;
+        return get().createTab({ cwd, tabName: tab.name });
+      },
 
       splitPane: async (paneId, direction, opts) => {
         const tab = get().tabs.find((t) =>

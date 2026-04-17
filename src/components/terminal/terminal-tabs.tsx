@@ -10,6 +10,7 @@ import {
   Globe,
   Terminal as TerminalIcon,
   FileText,
+  Copy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProjectPathPicker } from "@/components/projects/project-path-picker";
@@ -22,6 +23,7 @@ export function TerminalTabs() {
   const createTab = useTerminalStore((s) => s.createTab);
   const createBrowserTab = useTerminalStore((s) => s.createBrowserTab);
   const createFileTab = useTerminalStore((s) => s.createFileTab);
+  const duplicateTab = useTerminalStore((s) => s.duplicateTab);
   const renameTab = useTerminalStore((s) => s.renameTab);
 
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
@@ -76,6 +78,17 @@ export function TerminalTabs() {
               {tab.name}
             </span>
           )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              void duplicateTab(tab.id);
+            }}
+            className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-[var(--color-surface-hover)] transition-opacity"
+            aria-label="탭 복제"
+            title="탭 복제"
+          >
+            <Copy size={11} />
+          </button>
           <button
             onClick={(e) => {
               e.stopPropagation();

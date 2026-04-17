@@ -5,6 +5,7 @@ import {
   SplitSquareVertical,
   X,
   Globe,
+  FileText,
 } from "lucide-react";
 import { useTerminalStore } from "@/store/terminal-store";
 import type { TerminalPane as TerminalPaneType } from "@/types/terminal";
@@ -57,6 +58,13 @@ export function BrowserSplitPane({ pane, onFocus }: Props) {
             title="오른쪽에 브라우저 분할"
           >
             <Globe size={12} />
+          </button>
+          <button
+            onClick={() => splitPane(pane.id, "horizontal", { type: "file" })}
+            className="p-1 rounded hover:bg-[var(--color-surface-hover)]"
+            title="오른쪽에 파일 뷰어 분할"
+          >
+            <FileText size={12} />
           </button>
           <button
             onClick={() => closePane(pane.id)}
