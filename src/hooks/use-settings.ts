@@ -11,6 +11,9 @@ export interface SettingsResponse {
     hasToken: boolean;
     autoTransitionDone: boolean;
   };
+  terminal: {
+    shellPath: string;
+  };
 }
 
 const KEY = ["settings"] as const;
@@ -46,6 +49,9 @@ export function useUpdateSettings() {
         email?: string;
         apiToken?: string | null;
         autoTransitionDone?: boolean;
+      };
+      terminal?: {
+        shellPath?: string;
       };
     }) =>
       api<SettingsResponse>("/api/settings", {

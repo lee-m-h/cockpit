@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-const JIRA_KEYS = [
+const SETTING_KEYS = [
   "jira.host",
   "jira.email",
   "jira.apiToken",
   "jira.autoTransitionDone",
+  "terminal.shellPath",
 ];
 
 async function loadSettings() {
   const rows = await prisma.setting.findMany({
-    where: { key: { in: JIRA_KEYS } },
+    where: { key: { in: SETTING_KEYS } },
   });
   const map = new Map(rows.map((r) => [r.key, r.value]));
   return {
@@ -19,6 +20,9 @@ async function loadSettings() {
       email: map.get("jira.email") ?? "",
       hasToken: !!map.get("jira.apiToken"),
       autoTransitionDone: map.get("jira.autoTransitionDone") === "true",
+    },
+    terminal: {
+      shellPath: map.get("terminal.shellPath") ?? "",
     },
   };
 }
@@ -33,6 +37,9 @@ interface PutBody {
     email?: string;
     apiToken?: string | null; // null이면 제거
     autoTransitionDone?: boolean;
+  };
+  terminal?: {
+    shellPath?: string; // 빈 문자열이면 제거 (자동 감지)
   };
 }
 
@@ -77,6 +84,14 @@ export async function PUT(request: Request) {
         "jira.autoTransitionDone",
         jira.autoTransitionDone ? "true" : "false",
       );
+    }
+  }
+
+  if (body.terminal) {
+    if (body.terminal.shellPath !== undefined) {
+      const v = body.terminal.shellPath.trim();
+      if (v) await upsert("terminal.shellPath", v);
+      else await remove("terminal.shellPath");
     }
   }
 

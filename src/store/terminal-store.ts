@@ -215,6 +215,56 @@ function updateFilePanePath(
   };
 }
 
+/**
+ * 분할 트리를 재귀적으로 복제 — 각 pane은 새로 생성 (PTY는 새로 spawn, browser/file은 메타만 복사).
+ * 터미널 히스토리는 복제되지 않고, 동일한 cwd에서 새 세션 시작.
+ */
+async function cloneSplitNode(node: SplitNode): Promise<SplitNode | null> {
+  if (node.type === "leaf") {
+    const { pane } = node;
+    if (pane.type === "browser") {
+      const newPane: TerminalPane = {
+        id: `browser-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        cwd: pane.cwd,
+        title: pane.title,
+        type: "browser",
+        url: pane.url ?? "",
+      };
+      return { type: "leaf", pane: newPane };
+    }
+    if (pane.type === "file") {
+      const newPane: TerminalPane = {
+        id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        cwd: pane.cwd,
+        title: pane.title,
+        type: "file",
+        filePath: pane.filePath ?? "",
+      };
+      return { type: "leaf", pane: newPane };
+    }
+    // 터미널 pane — 새 PTY 생성
+    try {
+      const res = await createPty({ cwd: pane.cwd });
+      const newPane: TerminalPane = {
+        id: res.id,
+        cwd: res.cwd,
+        title: shortCwd(res.cwd),
+      };
+      return { type: "leaf", pane: newPane };
+    } catch {
+      return null;
+    }
+  }
+  // split — 자식들 재귀 복제
+  const children = await Promise.all(
+    node.children.map((c) => cloneSplitNode(c)),
+  );
+  const validChildren = children.filter((c): c is SplitNode => c !== null);
+  if (validChildren.length === 0) return null;
+  if (validChildren.length === 1) return validChildren[0];
+  return { ...node, children: validChildren };
+}
+
 function shortCwd(cwd: string): string {
   const base = cwd.split("/").filter(Boolean).pop() ?? "/";
   return base || "~";
@@ -412,10 +462,25 @@ export const useTerminalStore = create<TerminalState>()(
         if (tab.type === "file") {
           return get().createFileTab(tab.url, tab.name);
         }
-        // 터미널 탭 — 첫 pane의 cwd로 새 터미널 생성
-        const firstPane = findAllPanes(tab.root)[0];
-        const cwd = firstPane?.cwd;
-        return get().createTab({ cwd, tabName: tab.name });
+
+        // 터미널 탭 — 분할 트리 구조를 유지하면서 새 탭 생성
+        const newRoot = await cloneSplitNode(tab.root);
+        if (!newRoot) return null;
+
+        // 첫 pane을 기준으로 tabId 추출
+        const firstPane = findAllPanes(newRoot)[0];
+        const tabIdNew = `tab-${firstPane?.id ?? Date.now()}`;
+        const newTab: TerminalTab = {
+          id: tabIdNew,
+          name: `${tab.name} (복제)`,
+          root: newRoot,
+          ticketId: null,
+        };
+        set((s) => ({
+          tabs: [...s.tabs, newTab],
+          activeTabId: tabIdNew,
+        }));
+        return tabIdNew;
       },
 
       splitPane: async (paneId, direction, opts) => {
