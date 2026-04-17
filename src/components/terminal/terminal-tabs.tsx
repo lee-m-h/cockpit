@@ -4,7 +4,13 @@ import { useRef, useState } from "react";
 import { useTerminalStore } from "@/store/terminal-store";
 import { useActiveProjectStore } from "@/store/active-project-store";
 import { useProjects } from "@/hooks/use-projects";
-import { Plus, X, Globe, Terminal as TerminalIcon } from "lucide-react";
+import {
+  Plus,
+  X,
+  Globe,
+  Terminal as TerminalIcon,
+  FileText,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProjectPathPicker } from "@/components/projects/project-path-picker";
 
@@ -15,6 +21,7 @@ export function TerminalTabs() {
   const closeTab = useTerminalStore((s) => s.closeTab);
   const createTab = useTerminalStore((s) => s.createTab);
   const createBrowserTab = useTerminalStore((s) => s.createBrowserTab);
+  const createFileTab = useTerminalStore((s) => s.createFileTab);
   const renameTab = useTerminalStore((s) => s.renameTab);
 
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
@@ -44,6 +51,8 @@ export function TerminalTabs() {
         >
           {tab.type === "browser" ? (
             <Globe size={12} className="flex-shrink-0 opacity-70" />
+          ) : tab.type === "file" ? (
+            <FileText size={12} className="flex-shrink-0 opacity-70" />
           ) : (
             <TerminalIcon size={12} className="flex-shrink-0 opacity-70" />
           )}
@@ -106,6 +115,14 @@ export function TerminalTabs() {
         aria-label="새 브라우저 탭"
       >
         <Globe size={14} />
+      </button>
+      <button
+        onClick={() => createFileTab()}
+        className="flex items-center justify-center w-8 h-full text-[var(--color-foreground-muted)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-surface-hover)]"
+        title="새 파일 뷰어 탭"
+        aria-label="새 파일 뷰어 탭"
+      >
+        <FileText size={14} />
       </button>
     </div>
   );

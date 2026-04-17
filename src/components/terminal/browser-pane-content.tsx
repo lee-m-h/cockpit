@@ -17,17 +17,6 @@ const IS_ELECTRON =
   typeof navigator !== "undefined" &&
   /Electron/i.test(navigator.userAgent);
 
-interface CockpitElectronAPI {
-  dockDevTools: (webviewWCId: number, devtoolsWCId: number) => Promise<boolean>;
-  closeDevTools: (webviewWCId: number) => Promise<boolean>;
-  isDevToolsOpened: (webviewWCId: number) => Promise<boolean>;
-}
-declare global {
-  interface Window {
-    cockpitElectron?: CockpitElectronAPI;
-  }
-}
-
 interface Props {
   /** 탭 ID 또는 분할 pane ID */
   paneId: string;
@@ -53,11 +42,8 @@ export function BrowserContent({ paneId, initialUrl }: Props) {
   const [blocked, setBlocked] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const webviewContainerRef = useRef<HTMLDivElement>(null);
-  const devtoolsContainerRef = useRef<HTMLDivElement>(null);
   // Electron webview element (imperative)
   const webviewRef = useRef<HTMLElement | null>(null);
-  const devtoolsWebviewRef = useRef<HTMLElement | null>(null);
-  const [devtoolsOpen, setDevtoolsOpen] = useState(false);
 
   useEffect(() => {
     setInput(initialUrl);
@@ -105,10 +91,6 @@ export function BrowserContent({ paneId, initialUrl }: Props) {
       if (webviewRef.current) {
         webviewRef.current.remove();
         webviewRef.current = null;
-      }
-      if (devtoolsWebviewRef.current) {
-        devtoolsWebviewRef.current.remove();
-        devtoolsWebviewRef.current = null;
       }
     };
   }, []);
@@ -170,47 +152,19 @@ export function BrowserContent({ paneId, initialUrl }: Props) {
     window.open(currentUrl, "_blank", "noopener");
   };
 
-  const openDevTools = async () => {
+  const openDevTools = () => {
     if (!IS_ELECTRON || !webviewRef.current) return;
-    const api = window.cockpitElectron;
-    if (!api) return;
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const wv = webviewRef.current as any;
-    const webviewWCId: number | undefined = wv.getWebContentsId?.();
-    if (webviewWCId === undefined) return;
-
-    if (devtoolsOpen) {
-      // 닫기
-      await api.closeDevTools(webviewWCId);
-      if (devtoolsWebviewRef.current) {
-        devtoolsWebviewRef.current.remove();
-        devtoolsWebviewRef.current = null;
+    try {
+      if (wv.isDevToolsOpened?.()) {
+        wv.closeDevTools();
+      } else {
+        wv.openDevTools();
       }
-      setDevtoolsOpen(false);
-      return;
+    } catch {
+      // ignore
     }
-
-    // devtools를 호스팅할 webview 생성 (pane 하단)
-    if (!devtoolsContainerRef.current) return;
-    const dtView = document.createElement("webview");
-    dtView.setAttribute("src", "about:blank");
-    const el = dtView as HTMLElement;
-    el.style.position = "absolute";
-    el.style.inset = "0";
-    el.style.display = "flex";
-    devtoolsContainerRef.current.appendChild(dtView);
-    devtoolsWebviewRef.current = dtView;
-
-    const onReady = async () => {
-      dtView.removeEventListener("dom-ready", onReady);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const dtWCId: number | undefined = (dtView as any).getWebContentsId?.();
-      if (dtWCId === undefined) return;
-      await api.dockDevTools(webviewWCId, dtWCId);
-      setDevtoolsOpen(true);
-    };
-    dtView.addEventListener("dom-ready", onReady);
   };
 
   const onSubmit = (e: React.FormEvent) => {
@@ -321,17 +275,6 @@ export function BrowserContent({ paneId, initialUrl }: Props) {
           )}
         </div>
 
-        {/* DevTools 도킹 영역 (열려있을 때만 표시) */}
-        {IS_ELECTRON && (
-          <div
-            ref={devtoolsContainerRef}
-            className={
-              devtoolsOpen
-                ? "relative h-[300px] border-t border-[var(--color-border)] bg-white"
-                : "hidden"
-            }
-          />
-        )}
       </div>
     </div>
   );

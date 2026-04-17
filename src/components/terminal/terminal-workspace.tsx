@@ -5,6 +5,7 @@ import { useTerminalStore } from "@/store/terminal-store";
 import { TerminalTabs } from "./terminal-tabs";
 import { TerminalSplit } from "./terminal-split";
 import { BrowserPane } from "./browser-pane";
+import { FilePane } from "./file-pane";
 import { Terminal as TerminalIcon } from "lucide-react";
 
 export function TerminalWorkspace() {
@@ -71,6 +72,8 @@ export function TerminalWorkspace() {
             >
               {tab.type === "browser" ? (
                 <BrowserPane tabId={tab.id} initialUrl={tab.url} />
+              ) : tab.type === "file" ? (
+                <FilePane tabId={tab.id} initialPath={tab.url} />
               ) : (
                 <TerminalSplit node={tab.root} tabId={tab.id} />
               )}

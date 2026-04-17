@@ -39,10 +39,20 @@ interface TerminalState {
   /** 브라우저 URL 갱신 (탭 또는 분할 내 브라우저 pane) */
   setBrowserUrl: (id: string, url: string) => void;
 
+  /** 파일 뷰어 탭 생성 */
+  createFileTab: (filePath?: string, tabName?: string) => string;
+  /** 파일 뷰어 경로 갱신 */
+  setFilePath: (id: string, filePath: string) => void;
+
   splitPane: (
     paneId: string,
     direction: SplitDirection,
-    opts?: { cwd?: string; type?: "terminal" | "browser"; url?: string },
+    opts?: {
+      cwd?: string;
+      type?: "terminal" | "browser" | "file";
+      url?: string;
+      filePath?: string;
+    },
   ) => Promise<void>;
   closePane: (paneId: string) => Promise<void>;
 
@@ -184,6 +194,24 @@ function updateBrowserPaneUrl(
   };
 }
 
+/** split 트리 내의 file pane 경로 갱신 */
+function updateFilePanePath(
+  node: SplitNode,
+  paneId: string,
+  filePath: string,
+): SplitNode {
+  if (node.type === "leaf") {
+    if (node.pane.id === paneId && node.pane.type === "file") {
+      return { type: "leaf", pane: { ...node.pane, filePath } };
+    }
+    return node;
+  }
+  return {
+    ...node,
+    children: node.children.map((c) => updateFilePanePath(c, paneId, filePath)),
+  };
+}
+
 function shortCwd(cwd: string): string {
   const base = cwd.split("/").filter(Boolean).pop() ?? "/";
   return base || "~";
@@ -260,8 +288,8 @@ export const useTerminalStore = create<TerminalState>()(
       closeTab: async (tabId) => {
         const tab = get().tabs.find((t) => t.id === tabId);
         if (!tab) return;
-        // 브라우저 탭은 pty 없음 → 그냥 state에서만 제거
-        if (tab.type === "browser") {
+        // 브라우저/파일 탭은 pty 없음 → 그냥 state에서만 제거
+        if (tab.type === "browser" || tab.type === "file") {
           set((s) => {
             const remaining = s.tabs.filter((t) => t.id !== tabId);
             const nextActive =
@@ -343,6 +371,35 @@ export const useTerminalStore = create<TerminalState>()(
           }),
         })),
 
+      createFileTab: (filePath, tabName) => {
+        const tabId = `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const dummyPane: TerminalPane = {
+          id: tabId,
+          cwd: filePath ?? "",
+          title: tabName ?? "파일 뷰어",
+          initialInput: null,
+          type: "file",
+          filePath: filePath ?? "",
+        };
+        const tab: TerminalTab = {
+          id: tabId,
+          name: tabName ?? "파일",
+          root: { type: "leaf", pane: dummyPane },
+          type: "file",
+          url: filePath ?? "",
+        };
+        set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tabId }));
+        return tabId;
+      },
+
+      setFilePath: (id, filePath) =>
+        set((s) => ({
+          tabs: s.tabs.map((t) => ({
+            ...t,
+            root: updateFilePanePath(t.root, id, filePath),
+          })),
+        })),
+
       splitPane: async (paneId, direction, opts) => {
         const tab = get().tabs.find((t) =>
           findAllPanes(t.root).some((p) => p.id === paneId),
@@ -359,6 +416,15 @@ export const useTerminalStore = create<TerminalState>()(
             title: "브라우저",
             type: "browser",
             url: opts.url ?? "",
+          };
+        } else if (opts?.type === "file") {
+          // 파일 뷰어 pane
+          newPane = {
+            id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            cwd: "",
+            title: "파일 뷰어",
+            type: "file",
+            filePath: opts.filePath ?? "",
           };
         } else {
           // opts.cwd가 명시되면 그 경로, 아니면 현재 패널 cwd를 기본으로 사용.
@@ -386,8 +452,8 @@ export const useTerminalStore = create<TerminalState>()(
       },
 
       closePane: async (paneId) => {
-        // 브라우저 pane은 pty 없음
-        if (!paneId.startsWith("browser-")) {
+        // 브라우저/파일 pane은 pty 없음
+        if (!paneId.startsWith("browser-") && !paneId.startsWith("file-")) {
           await deletePty(paneId);
         }
         set((s) => {
@@ -417,8 +483,8 @@ export const useTerminalStore = create<TerminalState>()(
           set((s) => {
             const filtered: TerminalTab[] = [];
             for (const t of s.tabs) {
-              // 브라우저 탭은 pty와 무관하므로 그대로 유지
-              if (t.type === "browser") {
+              // 브라우저/파일 탭은 pty와 무관하므로 그대로 유지
+              if (t.type === "browser" || t.type === "file") {
                 filtered.push(t);
                 continue;
               }
