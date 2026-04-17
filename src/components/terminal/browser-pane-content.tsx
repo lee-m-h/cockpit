@@ -65,9 +65,14 @@ export function BrowserContent({ paneId, initialUrl }: Props) {
       const wv = document.createElement("webview");
       wv.setAttribute("src", currentUrl);
       wv.setAttribute("allowpopups", "true");
-      (wv as HTMLElement).style.width = "100%";
-      (wv as HTMLElement).style.height = "100%";
-      (wv as HTMLElement).style.display = "inline-flex";
+      const el = wv as HTMLElement;
+      // 컨테이너에 absolute로 꽉 채움 → 스크롤 없음
+      el.style.position = "absolute";
+      el.style.top = "0";
+      el.style.left = "0";
+      el.style.width = "100%";
+      el.style.height = "100%";
+      el.style.display = "flex";
       webviewContainerRef.current.appendChild(wv);
       webviewRef.current = wv;
     } else {
@@ -203,7 +208,7 @@ export function BrowserContent({ paneId, initialUrl }: Props) {
           IS_ELECTRON ? (
             <div
               ref={webviewContainerRef}
-              className="w-full h-full flex"
+              className="absolute inset-0 overflow-hidden"
             />
           ) : (
             <>
