@@ -114,7 +114,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
         <h2 className="text-xs font-semibold text-[var(--color-foreground-muted)] uppercase tracking-wider flex-shrink-0">
           파일
         </h2>
-        <div className="flex-1 min-h-0 grid grid-cols-[minmax(240px,1fr)_2fr] gap-3">
+        <div className="flex-1 min-h-0 grid grid-cols-[320px_1fr] gap-3">
           {/* 파일 트리 */}
           <div className="min-h-0 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]/30 overflow-hidden">
             <FileTree

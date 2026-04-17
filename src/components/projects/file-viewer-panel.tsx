@@ -2,8 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Terminal as TerminalIcon, X } from "lucide-react";
+import {
+  ExternalLink,
+  Terminal as TerminalIcon,
+  X,
+  FileCode,
+  FileText,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 /** POSIX dirname 최소 구현 */
 function dirname(p: string): string {
@@ -40,6 +49,17 @@ export function FileViewerPanel({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  const isMarkdown = /\.(md|markdown|mdx)$/i.test(name);
+  // 마크다운 파일은 기본적으로 렌더링 모드, 아니면 원문
+  const [renderMode, setRenderMode] = useState<"rendered" | "source">(
+    isMarkdown ? "rendered" : "source",
+  );
+
+  // 파일 바뀌면 모드 초기화
+  useEffect(() => {
+    setRenderMode(isMarkdown ? "rendered" : "source");
+  }, [relPath, isMarkdown]);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,6 +130,34 @@ export function FileViewerPanel({
         <Button size="sm" variant="outline" onClick={openTerminalAtDir}>
           <TerminalIcon size={12} /> 터미널 열기
         </Button>
+        {isMarkdown && (
+          <div className="ml-auto flex items-center gap-0 rounded-md border border-[var(--color-border)] overflow-hidden">
+            <button
+              onClick={() => setRenderMode("rendered")}
+              className={cn(
+                "flex items-center gap-1 px-2 h-7 text-[10px]",
+                renderMode === "rendered"
+                  ? "bg-[var(--color-accent)] text-white"
+                  : "text-[var(--color-foreground-muted)] hover:bg-[var(--color-surface-hover)]",
+              )}
+              title="렌더링된 마크다운"
+            >
+              <FileText size={11} /> 렌더
+            </button>
+            <button
+              onClick={() => setRenderMode("source")}
+              className={cn(
+                "flex items-center gap-1 px-2 h-7 text-[10px] border-l border-[var(--color-border)]",
+                renderMode === "source"
+                  ? "bg-[var(--color-accent)] text-white"
+                  : "text-[var(--color-foreground-muted)] hover:bg-[var(--color-surface-hover)]",
+              )}
+              title="원본 텍스트"
+            >
+              <FileCode size={11} /> 소스
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto">
@@ -123,10 +171,20 @@ export function FileViewerPanel({
           <OversizePlaceholder size={data.size} onOpen={openInOS} />
         ) : data.binary ? (
           <BinaryPlaceholder onOpen={openInOS} />
+        ) : isMarkdown && renderMode === "rendered" ? (
+          <MarkdownContent content={data.content ?? ""} />
         ) : (
           <TextContent content={data.content ?? ""} />
         )}
       </div>
+    </div>
+  );
+}
+
+function MarkdownContent({ content }: { content: string }) {
+  return (
+    <div className="markdown-body p-6 text-sm text-[var(--color-foreground)]">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
     </div>
   );
 }
