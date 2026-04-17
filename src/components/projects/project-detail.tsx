@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   Terminal as TerminalIcon,
   KanbanSquare,
@@ -12,7 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { useProject, useUpdateProject } from "@/hooks/use-projects";
 import { useActiveProjectStore } from "@/store/active-project-store";
-import { FileTree, type SelectedFile } from "./file-tree";
+import { useProjectViewerStore } from "@/store/project-viewer-store";
+import { FileTree } from "./file-tree";
 import { FileViewerPanel } from "./file-viewer-panel";
 
 export function ProjectDetail({ projectId }: { projectId: string }) {
@@ -22,12 +23,11 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   const activeId = useActiveProjectStore((s) => s.activeProjectId);
   const router = useRouter();
 
-  const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
-
-  // 프로젝트 바뀌면 파일 선택 초기화
-  useEffect(() => {
-    setSelectedFile(null);
-  }, [projectId]);
+  // 선택한 파일을 projectId별로 영속 저장 → 네비게이션 간 유지
+  const selectedFile = useProjectViewerStore(
+    (s) => s.selectedFileByProject[projectId] ?? null,
+  );
+  const setSelectedFile = useProjectViewerStore((s) => s.setSelectedFile);
 
   // 상세 진입 시 자동으로 활성 프로젝트로 설정
   useEffect(() => {
@@ -120,12 +120,12 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
             <FileTree
               projectId={project.id}
               selectedRelPath={selectedFile?.relPath ?? null}
-              onSelectFile={setSelectedFile}
+              onSelectFile={(file) => setSelectedFile(project.id, file)}
             />
           </div>
 
           {/* 뷰어 */}
-          <div className="min-h-0">
+          <div className="min-h-0 min-w-0">
             {selectedFile ? (
               <FileViewerPanel
                 key={selectedFile.relPath}
@@ -133,7 +133,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
                 relPath={selectedFile.relPath}
                 absolutePath={selectedFile.absolutePath}
                 name={selectedFile.name}
-                onClose={() => setSelectedFile(null)}
+                onClose={() => setSelectedFile(project.id, null)}
               />
             ) : (
               <div className="h-full flex items-center justify-center rounded-md border border-dashed border-[var(--color-border)] text-xs text-[var(--color-foreground-dim)] p-4 text-center">

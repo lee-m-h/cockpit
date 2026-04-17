@@ -160,7 +160,7 @@ export function FileViewerPanel({
         )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="flex-1 min-h-0 min-w-0 overflow-auto">
         {loading ? (
           <div className="p-6 text-sm text-[var(--color-foreground-muted)]">
             불러오는 중…
@@ -192,12 +192,12 @@ function MarkdownContent({ content }: { content: string }) {
 function TextContent({ content }: { content: string }) {
   const lines = content.split("\n");
   return (
-    <pre className="p-0 text-xs font-mono bg-[var(--color-background)]">
-      <table className="w-full border-collapse">
+    <pre className="p-0 m-0 text-xs font-mono bg-[var(--color-background)] w-max min-w-full">
+      <table className="border-collapse">
         <tbody>
           {lines.map((line, i) => (
             <tr key={i} className="align-top">
-              <td className="select-none pr-3 pl-3 py-0 text-right text-[var(--color-foreground-dim)] border-r border-[var(--color-border)] w-[1%] whitespace-nowrap">
+              <td className="select-none pr-3 pl-3 py-0 text-right text-[var(--color-foreground-dim)] border-r border-[var(--color-border)] whitespace-nowrap sticky left-0 bg-[var(--color-background)]">
                 {i + 1}
               </td>
               <td className="pl-3 pr-3 py-0 whitespace-pre text-[var(--color-foreground)]">
