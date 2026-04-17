@@ -25,8 +25,11 @@ export function TerminalTabs() {
   const createFileTab = useTerminalStore((s) => s.createFileTab);
   const duplicateTab = useTerminalStore((s) => s.duplicateTab);
   const renameTab = useTerminalStore((s) => s.renameTab);
+  const reorderTabs = useTerminalStore((s) => s.reorderTabs);
 
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const activeId = useActiveProjectStore((s) => s.activeProjectId);
   const { data: projectsData } = useProjects();
@@ -39,9 +42,40 @@ export function TerminalTabs() {
 
   return (
     <div className="flex items-center h-9 bg-[var(--color-surface)] border-b border-[var(--color-border)] px-1 overflow-x-auto flex-shrink-0">
-      {tabs.map((tab) => (
+      {tabs.map((tab, idx) => (
         <div
           key={tab.id}
+          draggable
+          onDragStart={(e) => {
+            setDragIndex(idx);
+            e.dataTransfer.effectAllowed = "move";
+            try {
+              e.dataTransfer.setData("text/plain", tab.id);
+            } catch {
+              // ignore
+            }
+          }}
+          onDragOver={(e) => {
+            if (dragIndex === null) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            if (dragOverIndex !== idx) setDragOverIndex(idx);
+          }}
+          onDragLeave={() => {
+            if (dragOverIndex === idx) setDragOverIndex(null);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (dragIndex !== null && dragIndex !== idx) {
+              reorderTabs(dragIndex, idx);
+            }
+            setDragIndex(null);
+            setDragOverIndex(null);
+          }}
+          onDragEnd={() => {
+            setDragIndex(null);
+            setDragOverIndex(null);
+          }}
           onClick={() => setActive(tab.id)}
           className={cn(
             "group flex items-center gap-2 h-full px-3 text-sm cursor-pointer border-r border-[var(--color-border)]",
@@ -49,6 +83,10 @@ export function TerminalTabs() {
             tab.id === activeTabId
               ? "bg-[var(--color-background)] text-[var(--color-foreground)] border-b-2 border-b-[var(--color-accent)]"
               : "text-[var(--color-foreground-muted)]",
+            dragIndex === idx && "opacity-40",
+            dragOverIndex === idx &&
+              dragIndex !== idx &&
+              "border-l-2 border-l-[var(--color-accent)]",
           )}
         >
           {tab.type === "browser" ? (

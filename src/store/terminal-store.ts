@@ -47,6 +47,9 @@ interface TerminalState {
   /** 탭 복제 — 동일한 type/url/cwd로 새 탭 생성 */
   duplicateTab: (tabId: string) => Promise<string | null>;
 
+  /** 탭 순서 변경 — fromIndex의 탭을 toIndex 위치로 이동 */
+  reorderTabs: (fromIndex: number, toIndex: number) => void;
+
   splitPane: (
     paneId: string,
     direction: SplitDirection,
@@ -452,6 +455,24 @@ export const useTerminalStore = create<TerminalState>()(
             root: updateFilePanePath(t.root, id, filePath),
           })),
         })),
+
+      reorderTabs: (fromIndex, toIndex) => {
+        set((s) => {
+          if (
+            fromIndex < 0 ||
+            fromIndex >= s.tabs.length ||
+            toIndex < 0 ||
+            toIndex >= s.tabs.length ||
+            fromIndex === toIndex
+          ) {
+            return s;
+          }
+          const next = [...s.tabs];
+          const [moved] = next.splice(fromIndex, 1);
+          next.splice(toIndex, 0, moved);
+          return { tabs: next };
+        });
+      },
 
       duplicateTab: async (tabId) => {
         const tab = get().tabs.find((t) => t.id === tabId);
