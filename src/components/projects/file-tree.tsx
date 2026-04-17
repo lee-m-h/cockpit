@@ -14,40 +14,35 @@ import {
 import { useProjectTree } from "@/hooks/use-projects";
 import { cn } from "@/lib/utils";
 import type { TreeNode } from "@/types/project";
-import { FileViewerDialog } from "./file-viewer-dialog";
 
-interface FileTreeProps {
-  projectId: string;
-}
-
-interface ViewerState {
+export interface SelectedFile {
   relPath: string;
   absolutePath: string;
   name: string;
 }
 
-export function FileTree({ projectId }: FileTreeProps) {
-  const [viewer, setViewer] = useState<ViewerState | null>(null);
+interface FileTreeProps {
+  projectId: string;
+  /** 외부에서 선택 상태 제어 (인라인 뷰어 연동) */
+  selectedRelPath?: string | null;
+  onSelectFile?: (file: SelectedFile) => void;
+}
 
+export function FileTree({
+  projectId,
+  selectedRelPath,
+  onSelectFile,
+}: FileTreeProps) {
   return (
-    <>
-      <div className="max-h-[480px] overflow-y-auto p-2">
-        <TreeLevel
-          projectId={projectId}
-          subPath={undefined}
-          level={0}
-          onOpenFile={setViewer}
-        />
-      </div>
-      <FileViewerDialog
-        open={!!viewer}
-        onOpenChange={(v) => !v && setViewer(null)}
+    <div className="h-full overflow-y-auto p-2">
+      <TreeLevel
         projectId={projectId}
-        relPath={viewer?.relPath ?? null}
-        absolutePath={viewer?.absolutePath ?? null}
-        name={viewer?.name ?? null}
+        subPath={undefined}
+        level={0}
+        selectedRelPath={selectedRelPath ?? null}
+        onOpenFile={onSelectFile}
       />
-    </>
+    </div>
   );
 }
 
@@ -55,12 +50,14 @@ function TreeLevel({
   projectId,
   subPath,
   level,
+  selectedRelPath,
   onOpenFile,
 }: {
   projectId: string;
   subPath: string | undefined;
   level: number;
-  onOpenFile: (v: ViewerState) => void;
+  selectedRelPath: string | null;
+  onOpenFile?: (v: SelectedFile) => void;
 }) {
   const { data, isLoading, error } = useProjectTree(projectId, subPath, 1);
 
@@ -95,6 +92,7 @@ function TreeLevel({
           node={node}
           projectId={projectId}
           level={level}
+          selectedRelPath={selectedRelPath}
           onOpenFile={onOpenFile}
         />
       ))}
@@ -114,21 +112,24 @@ function TreeNodeView({
   node,
   projectId,
   level,
+  selectedRelPath,
   onOpenFile,
 }: {
   node: TreeNode;
   projectId: string;
   level: number;
-  onOpenFile: (v: ViewerState) => void;
+  selectedRelPath: string | null;
+  onOpenFile?: (v: SelectedFile) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const router = useRouter();
   const isDir = node.type === "directory";
+  const isSelected = !isDir && selectedRelPath === node.path;
 
   const handleRowClick = () => {
     if (isDir) {
       setExpanded((v) => !v);
-    } else {
+    } else if (onOpenFile) {
       onOpenFile({
         relPath: node.path,
         absolutePath: node.absolutePath,
@@ -154,7 +155,9 @@ function TreeNodeView({
       <div
         className={cn(
           "group flex items-center gap-1 rounded px-1 py-1 text-sm cursor-default",
-          "hover:bg-[var(--color-surface-hover)]",
+          isSelected
+            ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
+            : "hover:bg-[var(--color-surface-hover)]",
         )}
         style={{ paddingLeft: `${level * 14 + 4}px` }}
         onClick={handleRowClick}
@@ -220,6 +223,7 @@ function TreeNodeView({
           projectId={projectId}
           subPath={node.path}
           level={level + 1}
+          selectedRelPath={selectedRelPath}
           onOpenFile={onOpenFile}
         />
       )}

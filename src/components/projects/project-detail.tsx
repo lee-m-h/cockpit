@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Terminal as TerminalIcon,
   KanbanSquare,
@@ -12,7 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { useProject, useUpdateProject } from "@/hooks/use-projects";
 import { useActiveProjectStore } from "@/store/active-project-store";
-import { FileTree } from "./file-tree";
+import { FileTree, type SelectedFile } from "./file-tree";
+import { FileViewerPanel } from "./file-viewer-panel";
 
 export function ProjectDetail({ projectId }: { projectId: string }) {
   const { data: project, isLoading, error } = useProject(projectId);
@@ -20,6 +21,13 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   const setActive = useActiveProjectStore((s) => s.setActive);
   const activeId = useActiveProjectStore((s) => s.activeProjectId);
   const router = useRouter();
+
+  const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
+
+  // 프로젝트 바뀌면 파일 선택 초기화
+  useEffect(() => {
+    setSelectedFile(null);
+  }, [projectId]);
 
   // 상세 진입 시 자동으로 활성 프로젝트로 설정
   useEffect(() => {
@@ -44,15 +52,13 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   }
 
   const openTerminal = () => {
-    router.push(
-      `/terminal?newTabCwd=${encodeURIComponent(project.path)}`,
-    );
+    router.push(`/terminal?newTabCwd=${encodeURIComponent(project.path)}`);
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-4xl">
+    <div className="flex flex-col h-full min-h-0 p-6 gap-4">
       {/* 헤더 */}
-      <header className="flex items-start gap-3">
+      <header className="flex items-start gap-3 flex-shrink-0">
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-semibold">{project.name}</h1>
@@ -89,7 +95,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       </header>
 
       {/* 액션 */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 flex-shrink-0">
         <Button onClick={openTerminal}>
           <TerminalIcon size={14} /> 터미널 열기
         </Button>
@@ -103,13 +109,38 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
         )}
       </div>
 
-      {/* 파일 트리 */}
-      <section>
-        <h2 className="mb-2 text-xs font-semibold text-[var(--color-foreground-muted)] uppercase tracking-wider">
+      {/* 파일 트리 + 뷰어 (좌우 분할) */}
+      <section className="flex-1 min-h-0 flex flex-col gap-2">
+        <h2 className="text-xs font-semibold text-[var(--color-foreground-muted)] uppercase tracking-wider flex-shrink-0">
           파일
         </h2>
-        <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]/30">
-          <FileTree projectId={project.id} />
+        <div className="flex-1 min-h-0 grid grid-cols-[minmax(240px,1fr)_2fr] gap-3">
+          {/* 파일 트리 */}
+          <div className="min-h-0 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]/30 overflow-hidden">
+            <FileTree
+              projectId={project.id}
+              selectedRelPath={selectedFile?.relPath ?? null}
+              onSelectFile={setSelectedFile}
+            />
+          </div>
+
+          {/* 뷰어 */}
+          <div className="min-h-0">
+            {selectedFile ? (
+              <FileViewerPanel
+                key={selectedFile.relPath}
+                projectId={project.id}
+                relPath={selectedFile.relPath}
+                absolutePath={selectedFile.absolutePath}
+                name={selectedFile.name}
+                onClose={() => setSelectedFile(null)}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center rounded-md border border-dashed border-[var(--color-border)] text-xs text-[var(--color-foreground-dim)] p-4 text-center">
+                파일을 클릭하면 여기에 내용이 표시됩니다.
+              </div>
+            )}
+          </div>
         </div>
       </section>
     </div>

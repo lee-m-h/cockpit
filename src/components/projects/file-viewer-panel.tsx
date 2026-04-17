@@ -2,15 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Terminal as TerminalIcon } from "lucide-react";
+import { ExternalLink, Terminal as TerminalIcon, X } from "lucide-react";
 
-/** POSIX dirname 최소 구현 — 브라우저 번들에 path-browserify 불필요 */
+/** POSIX dirname 최소 구현 */
 function dirname(p: string): string {
   const idx = p.lastIndexOf("/");
   if (idx <= 0) return idx === 0 ? "/" : p;
@@ -27,21 +22,19 @@ interface FileResponse {
 }
 
 interface Props {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  projectId: string | null;
-  relPath: string | null;
-  absolutePath: string | null;
-  name: string | null;
+  projectId: string;
+  relPath: string;
+  absolutePath: string;
+  name: string;
+  onClose?: () => void;
 }
 
-export function FileViewerDialog({
-  open,
-  onOpenChange,
+export function FileViewerPanel({
   projectId,
   relPath,
   absolutePath,
   name,
+  onClose,
 }: Props) {
   const [data, setData] = useState<FileResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +42,6 @@ export function FileViewerDialog({
   const router = useRouter();
 
   useEffect(() => {
-    if (!open || !projectId || !relPath) return;
     let cancelled = false;
     setError(null);
     setData(null);
@@ -75,10 +67,9 @@ export function FileViewerDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, projectId, relPath]);
+  }, [projectId, relPath]);
 
   const openInOS = async () => {
-    if (!absolutePath) return;
     await fetch("/api/system/open", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -87,54 +78,56 @@ export function FileViewerDialog({
   };
 
   const openTerminalAtDir = () => {
-    if (!absolutePath) return;
     const dir = dirname(absolutePath);
     router.push(`/terminal?newTabCwd=${encodeURIComponent(dir)}`);
-    onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[90vw] p-0">
-        <div className="border-b border-[var(--color-border)] p-4">
-          <DialogTitle className="truncate">{name ?? "파일"}</DialogTitle>
-          {absolutePath && (
-            <div className="mt-1 text-[10px] text-[var(--color-foreground-dim)] font-mono truncate">
-              {absolutePath}
-            </div>
-          )}
-          <div className="mt-3 flex gap-2">
-            <Button size="sm" variant="outline" onClick={openInOS}>
-              <ExternalLink size={12} /> OS 기본 앱으로 열기
-            </Button>
-            <Button size="sm" variant="outline" onClick={openTerminalAtDir}>
-              <TerminalIcon size={12} /> 이 폴더에서 터미널 열기
-            </Button>
+    <div className="flex flex-col h-full min-h-0 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]/30 overflow-hidden">
+      <div className="flex items-start gap-2 p-3 border-b border-[var(--color-border)]">
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium truncate">{name}</div>
+          <div className="text-[10px] text-[var(--color-foreground-dim)] font-mono truncate mt-0.5">
+            {absolutePath}
           </div>
         </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="p-1 rounded text-[var(--color-foreground-dim)] hover:bg-[var(--color-surface-hover)]"
+            aria-label="닫기"
+            title="닫기"
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
 
-        <div className="p-0 min-h-[320px] max-h-[60vh] overflow-auto">
-          {loading ? (
-            <div className="p-6 text-sm text-[var(--color-foreground-muted)]">
-              불러오는 중…
-            </div>
-          ) : error ? (
-            <div className="p-6 text-sm text-[var(--color-danger)]">
-              {error}
-            </div>
-          ) : !data ? null : data.oversize ? (
-            <OversizePlaceholder
-              size={data.size}
-              onOpen={openInOS}
-            />
-          ) : data.binary ? (
-            <BinaryPlaceholder onOpen={openInOS} />
-          ) : (
-            <TextContent content={data.content ?? ""} />
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+      <div className="flex gap-2 px-3 py-2 border-b border-[var(--color-border)]">
+        <Button size="sm" variant="outline" onClick={openInOS}>
+          <ExternalLink size={12} /> 열기
+        </Button>
+        <Button size="sm" variant="outline" onClick={openTerminalAtDir}>
+          <TerminalIcon size={12} /> 터미널 열기
+        </Button>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-auto">
+        {loading ? (
+          <div className="p-6 text-sm text-[var(--color-foreground-muted)]">
+            불러오는 중…
+          </div>
+        ) : error ? (
+          <div className="p-6 text-sm text-[var(--color-danger)]">{error}</div>
+        ) : !data ? null : data.oversize ? (
+          <OversizePlaceholder size={data.size} onOpen={openInOS} />
+        ) : data.binary ? (
+          <BinaryPlaceholder onOpen={openInOS} />
+        ) : (
+          <TextContent content={data.content ?? ""} />
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -170,7 +163,7 @@ function BinaryPlaceholder({ onOpen }: { onOpen: () => void }) {
         이미지·영상·PDF 등은 OS 기본 앱으로 열어보세요.
       </p>
       <Button size="sm" onClick={onOpen}>
-        <ExternalLink size={12} /> OS 기본 앱으로 열기
+        <ExternalLink size={12} /> 열기
       </Button>
     </div>
   );
@@ -190,7 +183,7 @@ function OversizePlaceholder({
         파일이 너무 큽니다 ({mb} MB). Cockpit 내장 뷰어는 1MB 이하만 표시합니다.
       </p>
       <Button size="sm" onClick={onOpen}>
-        <ExternalLink size={12} /> OS 기본 앱으로 열기
+        <ExternalLink size={12} /> 열기
       </Button>
     </div>
   );
