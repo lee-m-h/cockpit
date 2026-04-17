@@ -26,11 +26,20 @@ stop_cockpit() {
     pid=$(cat "$PID_FILE")
     if kill -0 "$pid" 2>/dev/null; then
       log "중지 중 (pid=$pid)…"
+      # SIGTERM으로 Electron이 정상 종료(localStorage flush 포함)하도록 시간 줌
       kill "$pid" 2>/dev/null || true
-      sleep 1
+      for i in {1..10}; do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 0.3
+      done
+      # 여전히 살아있으면 강제 종료
       kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null || true
     fi
     rm -f "$PID_FILE"
+    # 남아있는 Cockpit Electron 프로세스 정리 (자식 프로세스가 분리된 경우 대비)
+    pkill -f "Electron.app/Contents/MacOS/Cockpit" 2>/dev/null || true
+    pkill -f "node_modules/.bin/tsx.*server.ts" 2>/dev/null || true
+    sleep 0.3
     log "중지됨."
   else
     warn "실행 중인 Cockpit이 없습니다."

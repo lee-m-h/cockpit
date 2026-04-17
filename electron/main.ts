@@ -4,9 +4,61 @@ import * as path from "path";
 import * as http from "http";
 import * as fs from "fs";
 import * as net from "net";
+import * as os from "os";
 
 // 앱 이름 설정 (Dock, 메뉴바, 창 타이틀에 표시됨)
 app.setName("Cockpit");
+
+// userData 경로 고정 — 업데이트 후에도 동일한 localStorage/쿠키 유지.
+// 기본은 ~/Library/Application Support/{app-name}인데, 실행 환경(네이티브 앱/dev/etc)에 따라
+// 경로가 달라지면 localStorage 데이터가 손실됨 → 명시적 고정.
+const COCKPIT_USER_DATA = path.join(os.homedir(), ".cockpit-userdata");
+try {
+  fs.mkdirSync(COCKPIT_USER_DATA, { recursive: true });
+} catch {
+  // ignore
+}
+
+// 기존에 쓰이던 위치에서 데이터 1회 마이그레이션 (Local Storage 파일 복사)
+function migrateIfNeeded() {
+  const newStorage = path.join(COCKPIT_USER_DATA, "Local Storage");
+  if (fs.existsSync(newStorage)) return; // 이미 새 위치에 데이터 있음
+
+  // 후보 legacy 경로들 (Mac/Linux/Win)
+  const legacyCandidates =
+    process.platform === "darwin"
+      ? [
+          path.join(os.homedir(), "Library", "Application Support", "Cockpit"),
+          path.join(os.homedir(), "Library", "Application Support", "Electron"),
+          path.join(os.homedir(), "Library", "Application Support", "cockpit"),
+        ]
+      : process.platform === "win32"
+        ? [
+            path.join(os.homedir(), "AppData", "Roaming", "Cockpit"),
+            path.join(os.homedir(), "AppData", "Roaming", "Electron"),
+          ]
+        : [
+            path.join(os.homedir(), ".config", "Cockpit"),
+            path.join(os.homedir(), ".config", "Electron"),
+          ];
+
+  for (const legacy of legacyCandidates) {
+    const legacyStorage = path.join(legacy, "Local Storage");
+    if (!fs.existsSync(legacyStorage)) continue;
+    try {
+      fs.cpSync(legacyStorage, newStorage, { recursive: true });
+      console.log(`[cockpit] localStorage 마이그레이션: ${legacy} → ${COCKPIT_USER_DATA}`);
+      break;
+    } catch (err) {
+      console.warn(
+        `[cockpit] 마이그레이션 실패 (${legacy}):`,
+        (err as Error).message,
+      );
+    }
+  }
+}
+migrateIfNeeded();
+app.setPath("userData", COCKPIT_USER_DATA);
 
 
 
