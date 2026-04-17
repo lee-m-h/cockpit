@@ -29,7 +29,10 @@ interface BrowseResponse {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onPick: (absolutePath: string) => void;
+  /** 단일 선택 콜백 */
+  onPick?: (absolutePath: string) => void;
+  /** 다중 선택 콜백. 주어지면 체크박스 UI 활성화 */
+  onPickMultiple?: (absolutePaths: string[]) => void;
   initialPath?: string;
 }
 
@@ -37,11 +40,14 @@ export function FolderPickerDialog({
   open,
   onOpenChange,
   onPick,
+  onPickMultiple,
   initialPath,
 }: Props) {
   const [currentPath, setCurrentPath] = useState<string | undefined>(initialPath);
   const [data, setData] = useState<BrowseResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const supportsMulti = !!onPickMultiple;
 
   useEffect(() => {
     if (!open) return;
@@ -56,7 +62,11 @@ export function FolderPickerDialog({
         return body as BrowseResponse;
       })
       .then((body) => {
-        if (!cancelled) setData(body);
+        if (!cancelled) {
+          setData(body);
+          // 경로 바뀌면 체크 초기화
+          setChecked(new Set());
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err.message);
@@ -73,9 +83,32 @@ export function FolderPickerDialog({
     setCurrentPath(parent);
   };
 
-  const confirm = () => {
+  const toggleCheck = (absPath: string) => {
+    setChecked((s) => {
+      const next = new Set(s);
+      if (next.has(absPath)) next.delete(absPath);
+      else next.add(absPath);
+      return next;
+    });
+  };
+
+  const toggleCheckAll = () => {
     if (!data) return;
+    setChecked((s) => {
+      if (s.size === data.nodes.length) return new Set();
+      return new Set(data.nodes.map((n) => n.absolutePath));
+    });
+  };
+
+  const confirmSingle = () => {
+    if (!data || !onPick) return;
     onPick(data.currentPath);
+    onOpenChange(false);
+  };
+
+  const confirmMultiple = () => {
+    if (checked.size === 0 || !onPickMultiple) return;
+    onPickMultiple(Array.from(checked));
     onOpenChange(false);
   };
 
@@ -123,6 +156,16 @@ export function FolderPickerDialog({
           <span className="flex-1 min-w-0 truncate text-xs font-mono text-[var(--color-foreground)]">
             {data?.currentPath ?? "…"}
           </span>
+          {supportsMulti && data && data.nodes.length > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={toggleCheckAll}
+              className="text-xs"
+            >
+              {checked.size === data.nodes.length ? "전체 해제" : "전체 선택"}
+            </Button>
+          )}
         </div>
 
         {/* 목록 */}
@@ -139,30 +182,73 @@ export function FolderPickerDialog({
             </div>
           ) : (
             data.nodes.map((n) => (
-              <button
+              <div
                 key={n.absolutePath}
-                onDoubleClick={() => setCurrentPath(n.absolutePath)}
-                onClick={() => setCurrentPath(n.absolutePath)}
                 className={cn(
-                  "w-full flex items-center gap-2 rounded px-2 py-1 text-sm text-left",
+                  "flex items-center gap-2 rounded px-2 py-1 text-sm",
                   "hover:bg-[var(--color-surface-hover)]",
                 )}
-                title="더블클릭으로 진입"
               >
-                <Folder size={12} className="text-[var(--color-foreground-muted)]" />
-                <span className="truncate">{n.name}</span>
-              </button>
+                {supportsMulti && (
+                  <input
+                    type="checkbox"
+                    checked={checked.has(n.absolutePath)}
+                    onChange={() => toggleCheck(n.absolutePath)}
+                    className="flex-shrink-0"
+                  />
+                )}
+                <button
+                  onDoubleClick={() => setCurrentPath(n.absolutePath)}
+                  onClick={() =>
+                    supportsMulti
+                      ? toggleCheck(n.absolutePath)
+                      : setCurrentPath(n.absolutePath)
+                  }
+                  className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                  title={
+                    supportsMulti
+                      ? "클릭 = 선택 · 더블클릭 = 진입"
+                      : "클릭으로 진입"
+                  }
+                >
+                  <Folder
+                    size={12}
+                    className="text-[var(--color-foreground-muted)] flex-shrink-0"
+                  />
+                  <span className="truncate">{n.name}</span>
+                </button>
+              </div>
             ))
           )}
         </div>
 
-        <div className="mt-4 flex items-center justify-end gap-2">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            취소
-          </Button>
-          <Button onClick={confirm} disabled={!data}>
-            이 폴더 선택
-          </Button>
+        <div className="mt-4 flex items-center justify-between gap-2">
+          <div className="text-xs text-[var(--color-foreground-dim)]">
+            {supportsMulti
+              ? `${checked.size}개 선택됨 · 체크한 폴더들을 각각 프로젝트로 등록`
+              : null}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+              취소
+            </Button>
+            {supportsMulti ? (
+              <>
+                {onPick && (
+                  <Button variant="outline" onClick={confirmSingle} disabled={!data}>
+                    이 폴더 선택
+                  </Button>
+                )}
+                <Button onClick={confirmMultiple} disabled={checked.size === 0}>
+                  {checked.size}개 일괄 등록
+                </Button>
+              </>
+            ) : (
+              <Button onClick={confirmSingle} disabled={!data}>
+                이 폴더 선택
+              </Button>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
