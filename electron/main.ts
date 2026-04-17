@@ -1,4 +1,12 @@
-import { app, BrowserWindow, Menu, shell, dialog } from "electron";
+import {
+  app,
+  BrowserWindow,
+  Menu,
+  shell,
+  dialog,
+  ipcMain,
+  webContents,
+} from "electron";
 import { spawn, type ChildProcess } from "child_process";
 import * as path from "path";
 import * as http from "http";
@@ -7,6 +15,36 @@ import * as net from "net";
 
 // 앱 이름 설정 (Dock, 메뉴바, 창 타이틀에 표시됨)
 app.setName("Cockpit");
+
+// ─── IPC: webview DevTools 도킹 ───────────────────────────
+ipcMain.handle(
+  "dock-devtools",
+  (_ev, webviewWCId: number, devtoolsWCId: number) => {
+    const wv = webContents.fromId(webviewWCId);
+    const dt = webContents.fromId(devtoolsWCId);
+    if (!wv || !dt) return false;
+    wv.setDevToolsWebContents(dt);
+    wv.openDevTools();
+    // 도킹된 devtools webContents 리사이즈 요청
+    dt.executeJavaScript(
+      `document.documentElement.style.height='100%';document.body.style.height='100%';`,
+    ).catch(() => {});
+    return true;
+  },
+);
+
+ipcMain.handle("close-devtools", (_ev, webviewWCId: number) => {
+  const wv = webContents.fromId(webviewWCId);
+  if (!wv) return false;
+  wv.closeDevTools();
+  return true;
+});
+
+ipcMain.handle("is-devtools-opened", (_ev, webviewWCId: number) => {
+  const wv = webContents.fromId(webviewWCId);
+  if (!wv) return false;
+  return wv.isDevToolsOpened();
+});
 
 const ROOT = path.resolve(__dirname, "..");
 

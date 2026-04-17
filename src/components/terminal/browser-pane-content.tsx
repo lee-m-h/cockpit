@@ -17,6 +17,17 @@ const IS_ELECTRON =
   typeof navigator !== "undefined" &&
   /Electron/i.test(navigator.userAgent);
 
+interface CockpitElectronAPI {
+  dockDevTools: (webviewWCId: number, devtoolsWCId: number) => Promise<boolean>;
+  closeDevTools: (webviewWCId: number) => Promise<boolean>;
+  isDevToolsOpened: (webviewWCId: number) => Promise<boolean>;
+}
+declare global {
+  interface Window {
+    cockpitElectron?: CockpitElectronAPI;
+  }
+}
+
 interface Props {
   /** 탭 ID 또는 분할 pane ID */
   paneId: string;
@@ -42,8 +53,11 @@ export function BrowserContent({ paneId, initialUrl }: Props) {
   const [blocked, setBlocked] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const webviewContainerRef = useRef<HTMLDivElement>(null);
+  const devtoolsContainerRef = useRef<HTMLDivElement>(null);
   // Electron webview element (imperative)
   const webviewRef = useRef<HTMLElement | null>(null);
+  const devtoolsWebviewRef = useRef<HTMLElement | null>(null);
+  const [devtoolsOpen, setDevtoolsOpen] = useState(false);
 
   useEffect(() => {
     setInput(initialUrl);
@@ -91,6 +105,10 @@ export function BrowserContent({ paneId, initialUrl }: Props) {
       if (webviewRef.current) {
         webviewRef.current.remove();
         webviewRef.current = null;
+      }
+      if (devtoolsWebviewRef.current) {
+        devtoolsWebviewRef.current.remove();
+        devtoolsWebviewRef.current = null;
       }
     };
   }, []);
@@ -152,19 +170,47 @@ export function BrowserContent({ paneId, initialUrl }: Props) {
     window.open(currentUrl, "_blank", "noopener");
   };
 
-  const openDevTools = () => {
+  const openDevTools = async () => {
     if (!IS_ELECTRON || !webviewRef.current) return;
+    const api = window.cockpitElectron;
+    if (!api) return;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const wv = webviewRef.current as any;
-    try {
-      if (wv.isDevToolsOpened?.()) {
-        wv.closeDevTools();
-      } else {
-        wv.openDevTools();
+    const webviewWCId: number | undefined = wv.getWebContentsId?.();
+    if (webviewWCId === undefined) return;
+
+    if (devtoolsOpen) {
+      // 닫기
+      await api.closeDevTools(webviewWCId);
+      if (devtoolsWebviewRef.current) {
+        devtoolsWebviewRef.current.remove();
+        devtoolsWebviewRef.current = null;
       }
-    } catch {
-      // ignore
+      setDevtoolsOpen(false);
+      return;
     }
+
+    // devtools를 호스팅할 webview 생성 (pane 하단)
+    if (!devtoolsContainerRef.current) return;
+    const dtView = document.createElement("webview");
+    dtView.setAttribute("src", "about:blank");
+    const el = dtView as HTMLElement;
+    el.style.position = "absolute";
+    el.style.inset = "0";
+    el.style.display = "flex";
+    devtoolsContainerRef.current.appendChild(dtView);
+    devtoolsWebviewRef.current = dtView;
+
+    const onReady = async () => {
+      dtView.removeEventListener("dom-ready", onReady);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dtWCId: number | undefined = (dtView as any).getWebContentsId?.();
+      if (dtWCId === undefined) return;
+      await api.dockDevTools(webviewWCId, dtWCId);
+      setDevtoolsOpen(true);
+    };
+    dtView.addEventListener("dom-ready", onReady);
   };
 
   const onSubmit = (e: React.FormEvent) => {
@@ -228,48 +274,63 @@ export function BrowserContent({ paneId, initialUrl }: Props) {
       </div>
 
       {/* 본체 — Electron은 <webview>, 웹은 iframe */}
-      <div className="flex-1 min-h-0 relative bg-white">
-        {currentUrl ? (
-          IS_ELECTRON ? (
-            <div
-              ref={webviewContainerRef}
-              className="absolute inset-0 overflow-hidden"
-            />
-          ) : (
-            <>
-              <iframe
-                ref={iframeRef}
-                src={currentUrl}
-                className="w-full h-full border-0"
-                referrerPolicy="no-referrer"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
-                onError={() => setBlocked(true)}
+      <div className="flex-1 min-h-0 flex flex-col">
+        {/* 메인 웹페이지 영역 */}
+        <div className="relative bg-white flex-1 min-h-0">
+          {currentUrl ? (
+            IS_ELECTRON ? (
+              <div
+                ref={webviewContainerRef}
+                className="absolute inset-0 overflow-hidden"
               />
-              {blocked && (
-                <div className="absolute inset-0 flex items-center justify-center bg-[var(--color-background)]/95 text-center p-6">
-                  <div>
-                    <AlertTriangle
-                      size={32}
-                      className="mx-auto text-[var(--color-warning)] mb-2"
-                    />
-                    <p className="text-sm text-[var(--color-foreground-muted)] mb-3">
-                      이 사이트는 iframe 임베드를 차단합니다.
-                    </p>
-                    <button
-                      onClick={openExternal}
-                      className="px-3 py-1.5 text-xs bg-[var(--color-accent)] text-white rounded inline-flex items-center gap-1"
-                    >
-                      <ExternalLink size={11} /> 기본 브라우저로 열기
-                    </button>
+            ) : (
+              <>
+                <iframe
+                  ref={iframeRef}
+                  src={currentUrl}
+                  className="w-full h-full border-0"
+                  referrerPolicy="no-referrer"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
+                  onError={() => setBlocked(true)}
+                />
+                {blocked && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-[var(--color-background)]/95 text-center p-6">
+                    <div>
+                      <AlertTriangle
+                        size={32}
+                        className="mx-auto text-[var(--color-warning)] mb-2"
+                      />
+                      <p className="text-sm text-[var(--color-foreground-muted)] mb-3">
+                        이 사이트는 iframe 임베드를 차단합니다.
+                      </p>
+                      <button
+                        onClick={openExternal}
+                        className="px-3 py-1.5 text-xs bg-[var(--color-accent)] text-white rounded inline-flex items-center gap-1"
+                      >
+                        <ExternalLink size={11} /> 기본 브라우저로 열기
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </>
-          )
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-[var(--color-foreground-muted)] bg-[var(--color-background)]">
-            주소창에 URL을 입력하세요.
-          </div>
+                )}
+              </>
+            )
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-sm text-[var(--color-foreground-muted)] bg-[var(--color-background)]">
+              주소창에 URL을 입력하세요.
+            </div>
+          )}
+        </div>
+
+        {/* DevTools 도킹 영역 (열려있을 때만 표시) */}
+        {IS_ELECTRON && (
+          <div
+            ref={devtoolsContainerRef}
+            className={
+              devtoolsOpen
+                ? "relative h-[300px] border-t border-[var(--color-border)] bg-white"
+                : "hidden"
+            }
+          />
         )}
       </div>
     </div>
