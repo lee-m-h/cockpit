@@ -186,6 +186,7 @@ function createWindow(): void {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      webviewTag: true, // <webview> 활성화 — 브라우저 pane에서 X-Frame-Options 우회용
     },
   });
 
