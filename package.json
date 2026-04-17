@@ -16,7 +16,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "fix-pty-perms": "node scripts/fix-pty-perms.mjs",
-    "postinstall": "node scripts/fix-pty-perms.mjs && prisma generate"
+    "postinstall": "node scripts/fix-pty-perms.mjs && node scripts/patch-electron-name.mjs && prisma generate"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
