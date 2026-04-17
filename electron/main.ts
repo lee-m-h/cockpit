@@ -3,6 +3,9 @@ import { spawn, type ChildProcess } from "child_process";
 import * as path from "path";
 import * as http from "http";
 
+// 앱 이름 설정 (Dock, 메뉴바, 창 타이틀에 표시됨)
+app.setName("Cockpit");
+
 const ROOT = path.resolve(__dirname, "..");
 
 let mainWindow: BrowserWindow | null = null;
@@ -126,6 +129,9 @@ function createWindow(): void {
   });
 
   mainWindow.loadURL(`http://127.0.0.1:${PORT}`);
+
+  // 페이지 title이 창 타이틀을 덮어쓰지 않도록 고정
+  mainWindow.on("page-title-updated", (e) => e.preventDefault());
 
   mainWindow.webContents.setWindowOpenHandler(({ url }: any) => {
     if (url.startsWith("http://127.0.0.1")) return { action: "allow" };
