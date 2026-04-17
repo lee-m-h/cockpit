@@ -81,13 +81,16 @@ function layoutCommits(commits: GraphCommit[]) {
     }
 
     // 3. first parent는 같은 레인에서 계속
-    //    단, first parent가 이미 다른 레인에서 기다려지고 있으면 현재 레인 즉시 해제
-    //    (feature 브랜치 커밋이 main 레인과 곧 합류할 때 — 다음 feature가 같은 레인 재사용 가능)
+    //    단, first parent가 **더 작은** 번호의 레인에서 이미 기다려지고 있으면
+    //    현재 레인을 즉시 해제 (해당 레인이 다음 feature에 재사용 가능).
+    //    lane 0(또는 더 낮은 레인)은 해제하지 않음 → 기준 축 유지.
     if (commit.parents.length > 0) {
       const firstParent = commit.parents[0];
       const alreadyExpectedAt = laneExpects.indexOf(firstParent);
-      if (alreadyExpectedAt !== -1 && alreadyExpectedAt !== assignedLane) {
-        // 이미 다른 레인이 이 parent를 기다리고 있음 → 현재 레인 해제
+      if (
+        alreadyExpectedAt !== -1 &&
+        alreadyExpectedAt < assignedLane // 더 왼쪽 레인이 있을 때만
+      ) {
         laneOccupied[assignedLane] = false;
         laneExpects[assignedLane] = null;
       } else {
