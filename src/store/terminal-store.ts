@@ -50,6 +50,9 @@ interface TerminalState {
   /** 탭 순서 변경 — fromIndex의 탭을 toIndex 위치로 이동 */
   reorderTabs: (fromIndex: number, toIndex: number) => void;
 
+  /** 같은 부모 split 내에서 pane 순서 변경 */
+  reorderPanes: (sourcePaneId: string, targetPaneId: string) => void;
+
   splitPane: (
     paneId: string,
     direction: SplitDirection,
@@ -215,6 +218,41 @@ function updateFilePanePath(
   return {
     ...node,
     children: node.children.map((c) => updateFilePanePath(c, paneId, filePath)),
+  };
+}
+
+/**
+ * 같은 부모 split 내에 두 pane이 모두 direct child이면 순서 swap.
+ * 다른 split에 있으면 변경 없음.
+ */
+function reorderWithinSameSplit(
+  node: SplitNode,
+  sourceId: string,
+  targetId: string,
+): SplitNode {
+  if (node.type === "leaf") return node;
+
+  // 현재 노드의 직접 자식 중 두 pane을 모두 포함하는지 확인
+  const childIndex = (cid: string): number =>
+    node.children.findIndex(
+      (c) => c.type === "leaf" && c.pane.id === cid,
+    );
+  const sIdx = childIndex(sourceId);
+  const tIdx = childIndex(targetId);
+
+  if (sIdx >= 0 && tIdx >= 0 && sIdx !== tIdx) {
+    const newChildren = [...node.children];
+    const [moved] = newChildren.splice(sIdx, 1);
+    newChildren.splice(tIdx, 0, moved);
+    return { ...node, children: newChildren };
+  }
+
+  // 자식 중 한쪽만 leaf이거나 더 깊이 있는 경우 → 재귀
+  return {
+    ...node,
+    children: node.children.map((c) =>
+      reorderWithinSameSplit(c, sourceId, targetId),
+    ),
   };
 }
 
@@ -455,6 +493,16 @@ export const useTerminalStore = create<TerminalState>()(
             root: updateFilePanePath(t.root, id, filePath),
           })),
         })),
+
+      reorderPanes: (sourceId, targetId) => {
+        if (sourceId === targetId) return;
+        set((s) => ({
+          tabs: s.tabs.map((t) => ({
+            ...t,
+            root: reorderWithinSameSplit(t.root, sourceId, targetId),
+          })),
+        }));
+      },
 
       reorderTabs: (fromIndex, toIndex) => {
         set((s) => {

@@ -10,6 +10,8 @@ import {
 import { useTerminalStore } from "@/store/terminal-store";
 import type { TerminalPane as TerminalPaneType } from "@/types/terminal";
 import { FilePaneContent } from "./file-pane-content";
+import { usePaneDnd } from "./use-pane-dnd";
+import { cn } from "@/lib/utils";
 
 interface Props {
   pane: TerminalPaneType;
@@ -20,14 +22,22 @@ interface Props {
 export function FileSplitPane({ pane, onFocus }: Props) {
   const splitPane = useTerminalStore((s) => s.splitPane);
   const closePane = useTerminalStore((s) => s.closePane);
+  const dnd = usePaneDnd(pane.id);
 
   return (
     <div
-      className="relative flex flex-col h-full min-h-0 bg-[var(--color-background)] border border-transparent group"
+      className={cn(
+        "relative flex flex-col h-full min-h-0 bg-[var(--color-background)] border border-transparent group",
+        dnd.isDragOver && "border-[var(--color-accent)]",
+      )}
       onMouseDown={onFocus}
       onClick={onFocus}
+      {...dnd.rootProps}
     >
-      <div className="flex items-center justify-between h-7 px-2 bg-[var(--color-surface)] border-b border-[var(--color-border)] text-xs text-[var(--color-foreground-muted)]">
+      <div
+        {...dnd.handleProps}
+        className="flex items-center justify-between h-7 px-2 bg-[var(--color-surface)] border-b border-[var(--color-border)] text-xs text-[var(--color-foreground-muted)] cursor-grab active:cursor-grabbing"
+      >
         <span className="flex items-center gap-1 truncate">
           <FileText size={11} className="flex-shrink-0 opacity-70" />
           {pane.title}

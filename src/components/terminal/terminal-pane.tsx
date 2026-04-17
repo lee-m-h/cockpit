@@ -16,6 +16,8 @@ import {
 import { useTerminalStore } from "@/store/terminal-store";
 import type { TerminalPane as TerminalPaneType } from "@/types/terminal";
 import { ProjectPathPicker } from "@/components/projects/project-path-picker";
+import { usePaneDnd } from "./use-pane-dnd";
+import { cn } from "@/lib/utils";
 
 // xterm 다크 테마 — globals.css 변수와 맞춤
 const XTERM_THEME = {
@@ -56,6 +58,7 @@ export function TerminalPane({ pane, isActive, onFocus }: TerminalPaneProps) {
 
   const splitPane = useTerminalStore((s) => s.splitPane);
   const closePane = useTerminalStore((s) => s.closePane);
+  const dnd = usePaneDnd(pane.id);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -165,12 +168,19 @@ export function TerminalPane({ pane, isActive, onFocus }: TerminalPaneProps) {
 
   return (
     <div
-      className="relative flex flex-col h-full min-h-0 bg-[var(--color-background)] border border-transparent group"
+      className={cn(
+        "relative flex flex-col h-full min-h-0 bg-[var(--color-background)] border border-transparent group",
+        dnd.isDragOver && "border-[var(--color-accent)]",
+      )}
       onMouseDown={onFocus}
       onClick={onFocus}
+      {...dnd.rootProps}
     >
       {/* 패인 헤더 */}
-      <div className="flex items-center justify-between h-7 px-2 bg-[var(--color-surface)] border-b border-[var(--color-border)] text-xs text-[var(--color-foreground-muted)]">
+      <div
+        {...dnd.handleProps}
+        className="flex items-center justify-between h-7 px-2 bg-[var(--color-surface)] border-b border-[var(--color-border)] text-xs text-[var(--color-foreground-muted)] cursor-grab active:cursor-grabbing"
+      >
         <span className="truncate">{pane.title}</span>
         <div
           className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity"
