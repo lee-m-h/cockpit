@@ -1,7 +1,8 @@
-import { app, BrowserWindow, Menu, shell } from "electron";
+import { app, BrowserWindow, Menu, shell, dialog } from "electron";
 import { spawn, type ChildProcess } from "child_process";
 import * as path from "path";
 import * as http from "http";
+import * as fs from "fs";
 
 // 앱 이름 설정 (Dock, 메뉴바, 창 타이틀에 표시됨)
 app.setName("Cockpit");
@@ -32,9 +33,30 @@ function waitForServer(timeoutMs = 30_000): Promise<void> {
 }
 
 // ─── 서버 프로세스 시작 ──────────────────────────────────────
+// 서버 로그 파일 (디버깅용)
+const SERVER_LOG = path.join(ROOT, "logs", "server.log");
+let serverStderr = "";
+
 function startServer(): void {
+  // 로그 디렉토리 생성
+  try {
+    fs.mkdirSync(path.dirname(SERVER_LOG), { recursive: true });
+  } catch {
+    // ignore
+  }
+
   const serverScript = path.join(ROOT, "server.ts");
   const tsxBin = path.join(ROOT, "node_modules", ".bin", "tsx");
+
+  // tsx 바이너리가 없으면 설치 안 됐다는 뜻
+  if (!fs.existsSync(tsxBin)) {
+    dialog.showErrorBox(
+      "Cockpit 시작 실패",
+      `tsx 바이너리를 찾을 수 없습니다.\n\n경로: ${tsxBin}\n\n터미널에서 'cd ~/.cockpit-app && pnpm install' 을 실행해주세요.`,
+    );
+    app.quit();
+    return;
+  }
 
   const child = spawn(tsxBin, [serverScript], {
     cwd: ROOT,
@@ -49,10 +71,23 @@ function startServer(): void {
   });
 
   child.stdout?.on("data", (data: Buffer) => {
-    console.log(`[server] ${data.toString().trim()}`);
+    const text = data.toString();
+    console.log(`[server] ${text.trim()}`);
+    try {
+      fs.appendFileSync(SERVER_LOG, text);
+    } catch {
+      // ignore
+    }
   });
   child.stderr?.on("data", (data: Buffer) => {
-    console.error(`[server] ${data.toString().trim()}`);
+    const text = data.toString();
+    serverStderr += text;
+    console.error(`[server] ${text.trim()}`);
+    try {
+      fs.appendFileSync(SERVER_LOG, `[ERR] ${text}`);
+    } catch {
+      // ignore
+    }
   });
   child.on("exit", (code) => {
     console.log(`[server] 프로세스 종료 (code=${code})`);
@@ -156,6 +191,13 @@ app.whenReady().then(async () => {
     createWindow();
   } catch (err) {
     console.error("[cockpit] 서버 시작 실패:", err);
+    // 에러 상세 표시 (stderr 수집 포함)
+    const message = (err as Error).message;
+    const detail = serverStderr.slice(-2000) || "서버 로그가 없습니다.";
+    dialog.showErrorBox(
+      "Cockpit 서버 시작 실패",
+      `${message}\n\n[서버 로그 마지막]\n${detail}\n\n로그 전체: ${SERVER_LOG}\n\n포트 4000이 다른 프로세스에 의해 사용 중일 수 있습니다.\n터미널에서 'lsof -ti :4000' 으로 확인해주세요.`,
+    );
     app.quit();
   }
 
