@@ -11,6 +11,7 @@ import {
   Home,
   Folder,
   ChevronUp,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -142,7 +143,7 @@ export function FolderPickerDialog({
           </div>
         )}
 
-        {/* 현재 경로 */}
+        {/* 현재 경로 (breadcrumb) */}
         <div className="mt-3 flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-2 py-1.5">
           <Button
             size="icon"
@@ -153,9 +154,18 @@ export function FolderPickerDialog({
           >
             <ChevronUp size={14} />
           </Button>
-          <span className="flex-1 min-w-0 truncate text-xs font-mono text-[var(--color-foreground)]">
-            {data?.currentPath ?? "…"}
-          </span>
+          <div className="flex-1 min-w-0 overflow-x-auto">
+            {data ? (
+              <Breadcrumb
+                path={data.currentPath}
+                onNavigate={(p) => setCurrentPath(p)}
+              />
+            ) : (
+              <span className="text-xs font-mono text-[var(--color-foreground-dim)]">
+                …
+              </span>
+            )}
+          </div>
           {supportsMulti && data && data.nodes.length > 0 && (
             <Button
               size="sm"
@@ -252,5 +262,53 @@ export function FolderPickerDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** 경로의 각 세그먼트를 클릭 가능한 breadcrumb으로 표시 */
+function Breadcrumb({
+  path,
+  onNavigate,
+}: {
+  path: string;
+  onNavigate: (path: string) => void;
+}) {
+  // "/" → ["/"], "/Users/myoungha/x" → ["/", "Users", "myoungha", "x"]
+  const segments = path.split("/").filter(Boolean);
+  const items: Array<{ label: string; path: string }> = [
+    { label: "/", path: "/" },
+    ...segments.map((seg, i) => ({
+      label: seg,
+      path: "/" + segments.slice(0, i + 1).join("/"),
+    })),
+  ];
+
+  return (
+    <div className="flex items-center gap-0.5 text-xs font-mono whitespace-nowrap">
+      {items.map((item, i) => {
+        const isLast = i === items.length - 1;
+        return (
+          <span key={item.path} className="flex items-center gap-0.5">
+            <button
+              onClick={() => onNavigate(item.path)}
+              className={
+                isLast
+                  ? "text-[var(--color-foreground)] font-medium px-1"
+                  : "text-[var(--color-foreground-muted)] hover:text-[var(--color-accent)] hover:underline px-1 rounded"
+              }
+              title={`${item.path} 로 이동`}
+            >
+              {item.label}
+            </button>
+            {!isLast && (
+              <ChevronRight
+                size={10}
+                className="text-[var(--color-foreground-dim)] flex-shrink-0"
+              />
+            )}
+          </span>
+        );
+      })}
+    </div>
   );
 }
