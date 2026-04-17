@@ -3,6 +3,7 @@ import { spawn, type ChildProcess } from "child_process";
 import * as path from "path";
 import * as http from "http";
 import * as fs from "fs";
+import * as net from "net";
 
 // 앱 이름 설정 (Dock, 메뉴바, 창 타이틀에 표시됨)
 app.setName("Cockpit");
@@ -11,7 +12,32 @@ const ROOT = path.resolve(__dirname, "..");
 
 let mainWindow: BrowserWindow | null = null;
 let serverProcess: ChildProcess | null = null;
-const PORT = 4000;
+let PORT = 4000; // 포트 충돌 시 자동으로 빈 포트로 변경
+
+// ─── 빈 포트 찾기 ────────────────────────────────────────────
+function findFreePort(preferred: number): Promise<number> {
+  return new Promise((resolve) => {
+    const srv = net.createServer();
+    srv.listen(preferred, "127.0.0.1", () => {
+      const addr = srv.address();
+      srv.close(() => {
+        if (addr && typeof addr !== "string") resolve(addr.port);
+        else resolve(preferred);
+      });
+    });
+    srv.on("error", () => {
+      // preferred 포트 점유 → OS가 빈 포트 할당
+      const srv2 = net.createServer();
+      srv2.listen(0, "127.0.0.1", () => {
+        const addr = srv2.address();
+        srv2.close(() => {
+          if (addr && typeof addr !== "string") resolve(addr.port);
+          else resolve(preferred);
+        });
+      });
+    });
+  });
+}
 
 // ─── 서버 기동 대기 ──────────────────────────────────────────
 function waitForServer(timeoutMs = 30_000): Promise<void> {
@@ -182,6 +208,11 @@ function createWindow(): void {
 // ─── 앱 라이프사이클 ─────────────────────────────────────────
 app.whenReady().then(async () => {
   buildMenu();
+
+  // 빈 포트 먼저 확보 (4000이 점유되어 있으면 자동으로 다른 포트)
+  PORT = await findFreePort(4000);
+  console.log(`[cockpit] 포트 선택: ${PORT}`);
+
   startServer();
 
   try {
