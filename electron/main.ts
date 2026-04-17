@@ -17,25 +17,41 @@ let serverProcess: ChildProcess | null = null;
 let PORT = 4000; // 포트 충돌 시 자동으로 빈 포트로 변경
 
 // ─── 빈 포트 찾기 ────────────────────────────────────────────
-function findFreePort(preferred: number): Promise<number> {
+/** 포트가 free인지 확인 */
+function isPortFree(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const srv = net.createServer();
-    srv.listen(preferred, "127.0.0.1", () => {
+    srv.once("error", () => resolve(false));
+    srv.listen(port, "127.0.0.1", () => {
+      srv.close(() => resolve(true));
+    });
+  });
+}
+
+/**
+ * preferred 포트가 풀릴 때까지 최대 maxWaitMs 대기.
+ * 끝까지 안 풀리면 OS가 할당한 빈 포트 반환.
+ *
+ * 중요: 동일한 origin(포트)을 유지해야 localStorage가 보존되므로
+ * 이전 프로세스가 정리 중이라면 최대 10초까지 기다림.
+ */
+async function findFreePort(
+  preferred: number,
+  maxWaitMs = 10_000,
+): Promise<number> {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    if (await isPortFree(preferred)) return preferred;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  // fallback: OS가 빈 포트 할당
+  return new Promise((resolve) => {
+    const srv = net.createServer();
+    srv.listen(0, "127.0.0.1", () => {
       const addr = srv.address();
       srv.close(() => {
         if (addr && typeof addr !== "string") resolve(addr.port);
         else resolve(preferred);
-      });
-    });
-    srv.on("error", () => {
-      // preferred 포트 점유 → OS가 빈 포트 할당
-      const srv2 = net.createServer();
-      srv2.listen(0, "127.0.0.1", () => {
-        const addr = srv2.address();
-        srv2.close(() => {
-          if (addr && typeof addr !== "string") resolve(addr.port);
-          else resolve(preferred);
-        });
       });
     });
   });
