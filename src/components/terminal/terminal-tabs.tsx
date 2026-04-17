@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useTerminalStore } from "@/store/terminal-store";
 import { useActiveProjectStore } from "@/store/active-project-store";
 import { useProjects } from "@/hooks/use-projects";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Globe, Terminal as TerminalIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProjectPathPicker } from "@/components/projects/project-path-picker";
 
@@ -14,6 +14,7 @@ export function TerminalTabs() {
   const setActive = useTerminalStore((s) => s.setActiveTab);
   const closeTab = useTerminalStore((s) => s.closeTab);
   const createTab = useTerminalStore((s) => s.createTab);
+  const createBrowserTab = useTerminalStore((s) => s.createBrowserTab);
   const renameTab = useTerminalStore((s) => s.renameTab);
 
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
@@ -41,6 +42,11 @@ export function TerminalTabs() {
               : "text-[var(--color-foreground-muted)]",
           )}
         >
+          {tab.type === "browser" ? (
+            <Globe size={12} className="flex-shrink-0 opacity-70" />
+          ) : (
+            <TerminalIcon size={12} className="flex-shrink-0 opacity-70" />
+          )}
           {editingTabId === tab.id ? (
             <TabNameInput
               defaultValue={tab.name}
@@ -93,6 +99,14 @@ export function TerminalTabs() {
           </button>
         }
       />
+      <button
+        onClick={() => createBrowserTab()}
+        className="flex items-center justify-center w-8 h-full text-[var(--color-foreground-muted)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-surface-hover)]"
+        title="새 브라우저 탭"
+        aria-label="새 브라우저 탭"
+      >
+        <Globe size={14} />
+      </button>
     </div>
   );
 }

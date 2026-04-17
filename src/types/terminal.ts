@@ -26,6 +26,10 @@ export interface TerminalTab {
   root: SplitNode;
   /** 이 탭을 생성한 칸반 티켓 ID (실행 중 표시에 사용) */
   ticketId?: string | null;
+  /** 탭 종류 — "terminal"(기본) 또는 "browser" */
+  type?: "terminal" | "browser";
+  /** browser 탭 전용 URL */
+  url?: string;
 }
 
 export interface CreateTerminalResponse {

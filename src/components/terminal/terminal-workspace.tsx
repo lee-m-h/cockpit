@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useTerminalStore } from "@/store/terminal-store";
 import { TerminalTabs } from "./terminal-tabs";
 import { TerminalSplit } from "./terminal-split";
+import { BrowserPane } from "./browser-pane";
 import { Terminal as TerminalIcon } from "lucide-react";
 
 export function TerminalWorkspace() {
@@ -61,14 +62,18 @@ export function TerminalWorkspace() {
         {tabs.length === 0 ? (
           <EmptyState />
         ) : (
-          // 모든 탭을 mount 상태로 유지 (pty 세션 유지용), 비활성 탭은 hidden
+          // 모든 탭을 mount 상태로 유지 (pty 세션 / iframe 세션 유지용)
           tabs.map((tab) => (
             <div
               key={tab.id}
               className="absolute inset-0"
               style={{ display: tab.id === activeTabId ? "block" : "none" }}
             >
-              <TerminalSplit node={tab.root} tabId={tab.id} />
+              {tab.type === "browser" ? (
+                <BrowserPane tabId={tab.id} initialUrl={tab.url} />
+              ) : (
+                <TerminalSplit node={tab.root} tabId={tab.id} />
+              )}
             </div>
           ))
         )}

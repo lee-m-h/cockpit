@@ -34,6 +34,11 @@ interface TerminalState {
   renameTab: (tabId: string, name: string) => void;
   setActiveTab: (tabId: string) => void;
 
+  /** 브라우저 탭 생성 (URL은 선택) */
+  createBrowserTab: (url?: string, tabName?: string) => string;
+  /** 브라우저 탭 URL 갱신 */
+  setBrowserUrl: (tabId: string, url: string) => void;
+
   splitPane: (
     paneId: string,
     direction: SplitDirection,
@@ -237,6 +242,18 @@ export const useTerminalStore = create<TerminalState>()(
       closeTab: async (tabId) => {
         const tab = get().tabs.find((t) => t.id === tabId);
         if (!tab) return;
+        // 브라우저 탭은 pty 없음 → 그냥 state에서만 제거
+        if (tab.type === "browser") {
+          set((s) => {
+            const remaining = s.tabs.filter((t) => t.id !== tabId);
+            const nextActive =
+              s.activeTabId === tabId
+                ? (remaining[0]?.id ?? null)
+                : s.activeTabId;
+            return { tabs: remaining, activeTabId: nextActive };
+          });
+          return;
+        }
         const panes = findAllPanes(tab.root);
         await Promise.all(panes.map((p) => deletePty(p.id)));
 
@@ -271,6 +288,37 @@ export const useTerminalStore = create<TerminalState>()(
         })),
 
       setActiveTab: (tabId) => set({ activeTabId: tabId }),
+
+      createBrowserTab: (url, tabName) => {
+        const tabId = `browser-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        // browser 탭도 TerminalTab 타입 재사용 — root는 더미 leaf 사용 안 함.
+        // 렌더러에서 type === "browser"일 때 BrowserPane으로 분기.
+        const dummyPane: TerminalPane = {
+          id: tabId,
+          cwd: url ?? "",
+          title: tabName ?? "새 브라우저",
+          initialInput: null,
+        };
+        const tab: TerminalTab = {
+          id: tabId,
+          name: tabName ?? "브라우저",
+          root: { type: "leaf", pane: dummyPane },
+          type: "browser",
+          url: url ?? "",
+        };
+        set((s) => ({
+          tabs: [...s.tabs, tab],
+          activeTabId: tabId,
+        }));
+        return tabId;
+      },
+
+      setBrowserUrl: (tabId, url) =>
+        set((s) => ({
+          tabs: s.tabs.map((t) =>
+            t.id === tabId ? { ...t, url } : t,
+          ),
+        })),
 
       splitPane: async (paneId, direction, opts) => {
         const tab = get().tabs.find((t) =>
@@ -330,6 +378,11 @@ export const useTerminalStore = create<TerminalState>()(
           set((s) => {
             const filtered: TerminalTab[] = [];
             for (const t of s.tabs) {
+              // 브라우저 탭은 pty와 무관하므로 그대로 유지
+              if (t.type === "browser") {
+                filtered.push(t);
+                continue;
+              }
               const pruned = prunePanes(t.root, alive);
               if (pruned) filtered.push({ ...t, root: pruned });
             }
