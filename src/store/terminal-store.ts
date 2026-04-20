@@ -449,20 +449,9 @@ export const useTerminalStore = create<TerminalState>()(
         const panes = findAllPanes(tab.root);
         await Promise.all(panes.map((p) => deletePty(p.id)));
 
-        // 티켓 연결된 탭이면 → 자동으로 "review"로 전환
-        if (tab.ticketId) {
-          try {
-            await fetch(`/api/tickets/${tab.ticketId}`, {
-              method: "PATCH",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ status: "review" }),
-            });
-            // 칸반 등 다른 컴포넌트에 티켓 변경 알림
-            window.dispatchEvent(new CustomEvent("ticket-updated"));
-          } catch {
-            // 실패해도 탭 닫기는 진행
-          }
-        }
+        // 주의: 예전엔 티켓 연결 탭이 닫히면 자동으로 status=review로 바꿨지만,
+        // 지금은 백그라운드 runner가 실행 주체이므로 탭 닫기와 작업 상태는 분리한다.
+        // ("Claude 열기"로 대화형 검토만 하고 탭을 닫아도 runner는 계속 돈다)
 
         set((s) => {
           const remaining = s.tabs.filter((t) => t.id !== tabId);

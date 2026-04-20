@@ -28,6 +28,9 @@ interface CreateBody {
   priority?: number;
   jiraKey?: string;
   status?: string;
+  pdcaStage?: string | null;
+  autoMode?: string;
+  commitMode?: string;
 }
 
 export async function POST(request: Request) {
@@ -76,6 +79,10 @@ export async function POST(request: Request) {
       jiraKey: body.jiraKey?.trim() || null,
       status: body.status ?? "backlog",
       order: (maxOrder._max.order ?? 0) + 1,
+      // 기본적으로 모든 티켓은 PDCA 사이클로 시작 (pdcaStage="plan")
+      pdcaStage: body.pdcaStage === undefined ? "plan" : body.pdcaStage,
+      autoMode: body.autoMode ?? "manual",
+      commitMode: body.commitMode ?? "none",
     },
   });
   return NextResponse.json(ticket, { status: 201 });

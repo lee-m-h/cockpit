@@ -19,7 +19,10 @@ import { JiraPickerDialog } from "./jira-picker-dialog";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  projectId: string;
+  /** 특정 프로젝트에 속할 티켓이면 string, 전체 보기에서 생성하면 null */
+  projectId: string | null;
+  /** 전체 보기에서 생성 시 프로젝트를 고르기 위한 목록 */
+  projects?: Array<{ id: string; name: string }>;
   /** 편집 모드면 ticket 제공, 생성 모드면 null */
   ticket?: Ticket | null;
   /** 생성 모드에서 기본 상태(컬럼별 [+]용) */
@@ -32,55 +35,77 @@ export function TicketDialog({
   open,
   onOpenChange,
   projectId,
+  projects,
   ticket,
   defaultStatus,
   importIssue,
 }: Props) {
   const isEdit = !!ticket;
+  const needsProjectPick = !isEdit && !projectId; // 전체 보기에서 생성 시
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [successCriteria, setSuccessCriteria] = useState("");
   const [jiraKey, setJiraKey] = useState("");
   const [resultSummary, setResultSummary] = useState("");
+  const [autoMode, setAutoMode] = useState<string>("manual");
+  const [commitMode, setCommitMode] = useState<string>("none");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [jiraOpen, setJiraOpen] = useState(false);
 
-  const createMut = useCreateTicket(projectId);
-  const updateMut = useUpdateTicket(projectId);
+  // 편집 시엔 ticket.projectId를 쓰고, 생성 시엔 prop projectId 또는 사용자가 고른 값.
+  const effectiveProjectId = isEdit
+    ? (ticket?.projectId ?? null)
+    : projectId ?? (selectedProjectId || null);
+
+  const createMut = useCreateTicket(effectiveProjectId);
+  const updateMut = useUpdateTicket(effectiveProjectId);
 
   useEffect(() => {
     if (!open) return;
     if (ticket) {
       setTitle(ticket.title);
       setDescription(ticket.description ?? "");
-      setSuccessCriteria(ticket.successCriteria ?? "");
       setJiraKey(ticket.jiraKey ?? "");
       setResultSummary(ticket.resultSummary ?? "");
+      setAutoMode(ticket.autoMode || "manual");
+      setCommitMode(ticket.commitMode || "none");
     } else if (importIssue) {
       setTitle(importIssue.summary);
       setDescription(importIssue.description);
-      setSuccessCriteria("");
       setJiraKey(importIssue.key);
       setResultSummary("");
+      setAutoMode("manual");
+      setCommitMode("none");
     } else {
       setTitle("");
       setDescription("");
-      setSuccessCriteria("");
       setJiraKey("");
       setResultSummary("");
+      setAutoMode("manual");
+      setCommitMode("none");
+    }
+    if (!isEdit) {
+      setSelectedProjectId(projectId ?? "");
     }
     setError(null);
-  }, [open, ticket, importIssue]);
+  }, [open, ticket, importIssue, isEdit, projectId]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (needsProjectPick && !selectedProjectId) {
+      setError("프로젝트를 선택해주세요.");
+      return;
+    }
     const payload = {
       title: title.trim(),
       description: description.trim() || undefined,
-      successCriteria: successCriteria.trim() || undefined,
       jiraKey: jiraKey.trim() || undefined,
-      ...(isEdit ? { resultSummary: resultSummary.trim() || null } : {}),
+      autoMode,
+      commitMode,
+      ...(isEdit
+        ? { resultSummary: resultSummary.trim() || null }
+        : {}),
     };
     try {
       if (isEdit && ticket) {
@@ -114,6 +139,25 @@ export function TicketDialog({
         <DialogContent className="max-w-lg">
           <DialogTitle>{isEdit ? "티켓 편집" : "새 티켓"}</DialogTitle>
           <form onSubmit={submit} className="mt-4 flex flex-col gap-3">
+            {needsProjectPick && (
+              <label className="text-xs text-[var(--color-foreground-muted)]">
+                프로젝트 *
+                <select
+                  value={selectedProjectId}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                  required
+                  className="w-full mt-1 rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-2 py-1.5 text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                >
+                  <option value="">프로젝트 선택…</option>
+                  {projects?.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
             <label className="text-xs text-[var(--color-foreground-muted)]">
               제목 *
               <Input
@@ -154,15 +198,63 @@ export function TicketDialog({
               />
             </label>
 
+            <fieldset className="flex flex-col gap-1 border border-[var(--color-border)] rounded-md p-2 mt-1">
+              <legend className="text-[10px] text-[var(--color-foreground-dim)] px-1">
+                PDCA 실행 모드
+              </legend>
+              {[
+                {
+                  v: "manual",
+                  label: "단계별 승인 (기본)",
+                  hint: "각 단계 끝에서 사용자 승인 후 다음 단계로",
+                },
+                {
+                  v: "after_plan",
+                  label: "Plan 승인 후 자동",
+                  hint: "Plan만 승인받고 Design~Report는 자동 연쇄",
+                },
+                {
+                  v: "full",
+                  label: "완전 자동",
+                  hint: "승인 없이 Report까지 자동 — 범위 넓어질 수 있으니 주의",
+                },
+              ].map((o) => (
+                <label
+                  key={o.v}
+                  className="flex items-start gap-2 text-xs cursor-pointer hover:bg-[var(--color-surface-hover)] rounded px-1 py-1"
+                >
+                  <input
+                    type="radio"
+                    name="autoMode"
+                    value={o.v}
+                    checked={autoMode === o.v}
+                    onChange={() => setAutoMode(o.v)}
+                    className="mt-0.5 accent-[var(--color-accent)]"
+                  />
+                  <span className="flex-1">
+                    <span className="text-[var(--color-foreground)]">
+                      {o.label}
+                    </span>
+                    <span className="block text-[10px] text-[var(--color-foreground-dim)]">
+                      {o.hint}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+
             <label className="text-xs text-[var(--color-foreground-muted)]">
-              성공 기준
-              <textarea
-                value={successCriteria}
-                onChange={(e) => setSuccessCriteria(e.target.value)}
-                rows={3}
-                placeholder="- 테스트 통과&#10;- 배포 후 로그 에러 0건"
-                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-2 py-1.5 text-sm text-[var(--color-foreground)] placeholder:text-[var(--color-foreground-dim)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-              />
+              Report 완료 시 Git 동작
+              <select
+                value={commitMode}
+                onChange={(e) => setCommitMode(e.target.value)}
+                className="w-full mt-1 rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-2 py-1.5 text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+              >
+                <option value="none">안 함 (리뷰 상태로 유지)</option>
+                <option value="commit">자동 커밋</option>
+                <option value="commit_push">커밋 + 푸시</option>
+                <option value="commit_push_pr">커밋 + 푸시 + PR 생성</option>
+              </select>
             </label>
 
             {isEdit && ticket && ticket.status !== "backlog" && (

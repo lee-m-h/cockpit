@@ -17,6 +17,9 @@ interface PatchBody {
   sessionId?: string | null;
   completedAt?: string | null;
   resultSummary?: string | null;
+  pdcaStage?: string | null;
+  autoMode?: string;
+  commitMode?: string;
 }
 
 export async function PATCH(

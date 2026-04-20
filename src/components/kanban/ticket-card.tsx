@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import {
   MoreVertical,
   Play,
@@ -19,11 +18,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   useDeleteTicket,
-  useStartTicket,
   useUpdateTicket,
   useReworkTicket,
 } from "@/hooks/use-tickets";
-import { useTerminalStore, useIsTicketRunning } from "@/store/terminal-store";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import type { Ticket } from "@/types/ticket";
 
@@ -32,6 +30,7 @@ interface Props {
   projectId: string;
   showProjectBadge?: boolean;
   onEdit: (t: Ticket) => void;
+  onOpenRunning?: (t: Ticket) => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   isDragging?: boolean;
 }
@@ -41,27 +40,28 @@ export function TicketCard({
   projectId,
   showProjectBadge,
   onEdit,
+  onOpenRunning,
   dragHandleProps,
   isDragging,
 }: Props) {
-  const router = useRouter();
   const updateMut = useUpdateTicket(projectId);
   const deleteMut = useDeleteTicket(projectId);
-  const startMut = useStartTicket(projectId);
   const reworkMut = useReworkTicket(projectId);
-  const createTab = useTerminalStore((s) => s.createTab);
-  const isRunning = useIsTicketRunning(ticket.id);
+  const qc = useQueryClient();
+  const isRunning = ticket.status === "in_progress";
 
   const runTicket = async () => {
     try {
-      const res = await startMut.mutateAsync(ticket.id);
-      await createTab({
-        cwd: res.cwd,
-        initialInput: res.initialInput,
-        tabName: ticket.jiraKey ?? ticket.title.slice(0, 20),
-        ticketId: ticket.id,
+      const res = await fetch(`/api/tickets/${ticket.id}/run`, {
+        method: "POST",
       });
-      router.push("/terminal");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `${res.status}`);
+      }
+      qc.invalidateQueries({ queryKey: ["tickets"] });
+      // 우측 패널 자동 오픈
+      onOpenRunning?.(ticket);
     } catch (err) {
       alert(`실행 실패: ${(err as Error).message}`);
     }
@@ -108,6 +108,14 @@ export function TicketCard({
             {ticket.jiraKey}
           </span>
         )}
+        {ticket.pdcaStage && (
+          <span
+            className="px-1.5 py-0.5 rounded text-[10px] bg-purple-500/15 text-purple-400 font-medium"
+            title="PDCA 사이클 티켓"
+          >
+            PDCA · {String(ticket.pdcaStage)}
+          </span>
+        )}
         {ticket.sessionId && (
           <span
             className="px-1 py-0.5 rounded text-[10px] text-[var(--color-foreground-dim)]"
@@ -117,6 +125,20 @@ export function TicketCard({
           </span>
         )}
         <div className="flex-1" />
+        {ticket.status === "backlog" && (
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              runTicket();
+            }}
+            className="p-0.5 rounded text-green-400 hover:bg-green-500/15"
+            title={ticket.sessionId ? "이어서 실행" : "실행"}
+            aria-label="실행"
+          >
+            <Play size={12} fill="currentColor" />
+          </button>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -160,7 +182,12 @@ export function TicketCard({
         className="font-medium text-[var(--color-foreground)] truncate cursor-pointer"
         onClick={(e) => {
           e.stopPropagation();
-          onEdit(ticket);
+          // backlog: 편집 dialog, 그 외(in_progress/review/done): 우측 상세 패널
+          if (ticket.status !== "backlog" && onOpenRunning) {
+            onOpenRunning(ticket);
+          } else {
+            onEdit(ticket);
+          }
         }}
       >
         {ticket.title}

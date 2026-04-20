@@ -13,12 +13,13 @@ import {
 } from "@dnd-kit/core";
 import { useTickets, useUpdateTicket } from "@/hooks/use-tickets";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Inbox } from "lucide-react";
 import type { Ticket, TicketStatus } from "@/types/ticket";
 import { KanbanColumn } from "./column";
 import { TicketCard } from "./ticket-card";
 import { TicketDialog } from "./ticket-dialog";
-import { JiraPanel } from "./jira-panel";
+import { JiraDialog } from "./jira-dialog";
+import { RunningTicketPanel } from "./running-ticket-panel";
 
 const COLUMNS: { status: TicketStatus; label: string }[] = [
   { status: "backlog", label: "Backlog" },
@@ -52,6 +53,8 @@ export function KanbanBoard({
   const [editing, setEditing] = useState<Ticket | null>(null);
   const [createStatus, setCreateStatus] = useState<TicketStatus>("backlog");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [jiraOpen, setJiraOpen] = useState(false);
+  const [runningTicketId, setRunningTicketId] = useState<string | null>(null);
   // Jira 이슈 임포트용
   const [importIssue, setImportIssue] = useState<{
     key: string;
@@ -65,6 +68,9 @@ export function KanbanBoard({
 
   const tickets = data?.tickets ?? [];
   const activeTicket = tickets.find((t) => t.id === activeId) ?? null;
+  const runningTicket = runningTicketId
+    ? (tickets.find((t) => t.id === runningTicketId) ?? null)
+    : null;
   const showProjectBadge = !projectId; // 전체 보기일 때 프로젝트 뱃지 표시
 
   const byStatus = (s: TicketStatus) =>
@@ -110,6 +116,10 @@ export function KanbanBoard({
     setDialogOpen(true);
   };
 
+  const openRunning = (t: Ticket) => {
+    setRunningTicketId(t.id);
+  };
+
   /** Jira 패널에서 임포트 시 호출 */
   const handleJiraImport = (issue: {
     key: string;
@@ -152,11 +162,21 @@ export function KanbanBoard({
             </div>
           </div>
         </div>
-        {projectId && (
+        <div className="flex items-center gap-1.5">
+          {projectId && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setJiraOpen(true)}
+              title="내 미해결 Jira 이슈"
+            >
+              <Inbox size={14} /> 미해결 이슈
+            </Button>
+          )}
           <Button size="sm" onClick={() => openCreate("backlog")}>
             <Plus size={14} /> 새 티켓
           </Button>
-        )}
+        </div>
       </header>
 
       {isLoading ? (
@@ -164,25 +184,42 @@ export function KanbanBoard({
           불러오는 중…
         </div>
       ) : (
-        <div className="flex-1 min-h-0 flex">
+        <div className="flex-1 min-h-0 relative">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCorners}
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
           >
-            <div className="flex-1 min-h-0 grid grid-cols-4 gap-3 p-3">
+            <div
+              className="h-full min-h-0 flex gap-3 p-3 overflow-x-auto"
+              // 우측 상세 패널이 열리면 패널 폭만큼 padding을 더 줘서
+              // 가려지는 컬럼도 좌우 스크롤로 접근할 수 있게 한다.
+              style={{
+                paddingRight:
+                  "calc(0.75rem + var(--running-panel-width, 0px))",
+              }}
+            >
               {COLUMNS.map((c) => (
-                <KanbanColumn
+                <div
                   key={c.status}
-                  status={c.status}
-                  label={c.label}
-                  tickets={byStatus(c.status)}
-                  projectId={projectId ?? ""}
-                  showProjectBadge={showProjectBadge}
-                  onCreate={projectId ? openCreate : undefined}
-                  onEdit={openEdit}
-                />
+                  className={
+                    runningTicketId
+                      ? "w-[420px] shrink-0 flex flex-col"
+                      : "flex-1 min-w-0 flex flex-col"
+                  }
+                >
+                  <KanbanColumn
+                    status={c.status}
+                    label={c.label}
+                    tickets={byStatus(c.status)}
+                    projectId={projectId ?? ""}
+                    showProjectBadge={showProjectBadge}
+                    onCreate={projectId ? openCreate : undefined}
+                    onEdit={openEdit}
+                    onOpenRunning={openRunning}
+                  />
+                </div>
               ))}
             </div>
             <DragOverlay>
@@ -197,23 +234,33 @@ export function KanbanBoard({
               ) : null}
             </DragOverlay>
           </DndContext>
-          {/* Jira 미해결 이슈 사이드 패널 */}
-          {projectId && (
-            <JiraPanel onImport={handleJiraImport} />
+          {runningTicket && (
+            <RunningTicketPanel
+              ticket={runningTicket}
+              projectId={projectId}
+              onClose={() => setRunningTicketId(null)}
+            />
           )}
         </div>
       )}
 
       {projectId && (
-        <TicketDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          projectId={projectId}
-          ticket={editing}
-          defaultStatus={editing ? undefined : createStatus}
-          importIssue={importIssue}
+        <JiraDialog
+          open={jiraOpen}
+          onOpenChange={setJiraOpen}
+          onImport={handleJiraImport}
         />
       )}
+
+      <TicketDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        projectId={projectId}
+        projects={projects}
+        ticket={editing}
+        defaultStatus={editing ? undefined : createStatus}
+        importIssue={importIssue}
+      />
     </div>
   );
 }

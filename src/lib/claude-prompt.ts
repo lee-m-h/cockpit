@@ -1,16 +1,45 @@
 /**
  * 티켓 정보를 Claude CLI에 넘길 프롬프트와 명령어로 변환.
  */
+import { buildPdcaPrompt, type PdcaStage } from "./pdca-prompts";
+
 export interface TicketLike {
+  id?: string;
   title: string;
   description?: string | null;
   successCriteria?: string | null;
   type?: string | null;
   jiraKey?: string | null;
   lastReworkRequest?: string | null;
+  pdcaStage?: string | null;
+}
+
+function isPdcaStage(value: unknown): value is PdcaStage {
+  return (
+    value === "plan" ||
+    value === "design" ||
+    value === "do" ||
+    value === "check" ||
+    value === "report"
+  );
 }
 
 export function buildClaudePrompt(ticket: TicketLike): string {
+  // PDCA 티켓이면 현재 단계 전용 프롬프트 반환
+  if (isPdcaStage(ticket.pdcaStage) && ticket.id) {
+    return buildPdcaPrompt(
+      {
+        ticketId: ticket.id,
+        title: ticket.title,
+        description: ticket.description,
+        successCriteria: ticket.successCriteria,
+        jiraKey: ticket.jiraKey,
+        lastReworkRequest: ticket.lastReworkRequest,
+      },
+      ticket.pdcaStage,
+    );
+  }
+
   const parts: string[] = [];
   parts.push(`# ${ticket.title}`);
   if (ticket.jiraKey) parts.push(`(Jira: ${ticket.jiraKey})`);
@@ -34,6 +63,9 @@ export function buildClaudePrompt(ticket: TicketLike): string {
  */
 export function buildClaudeCommand(prompt: string, sessionId?: string | null): string {
   const resume = sessionId ? ` --resume ${sessionId}` : "";
+  // 칸반에서 실행되는 Claude는 승인 프롬프트 없이 끝까지 진행되도록 permission을 건너뜀.
+  // cockpit 자체가 샌드박스된 개발 환경을 전제로 하며, 사용자가 UI에서 승인/중지를 제어함.
+  const flags = " --dangerously-skip-permissions";
 
   if (process.platform === "win32") {
     // PowerShell: 쌍따옴표 안의 특수문자를 backtick(`)으로 이스케이프
@@ -41,7 +73,7 @@ export function buildClaudeCommand(prompt: string, sessionId?: string | null): s
       .replace(/`/g, "``")
       .replace(/"/g, '`"')
       .replace(/\$/g, "`$");
-    return `claude${resume} "${escaped}"\r`;
+    return `claude${resume}${flags} "${escaped}"\r`;
   }
 
   // Unix (bash/zsh)
@@ -50,5 +82,5 @@ export function buildClaudeCommand(prompt: string, sessionId?: string | null): s
     .replace(/"/g, '\\"')
     .replace(/\$/g, "\\$")
     .replace(/`/g, "\\`");
-  return `claude${resume} "${escaped}"\r`;
+  return `claude${resume}${flags} "${escaped}"\r`;
 }

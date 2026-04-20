@@ -1,5 +1,8 @@
 export type TicketStatus = "backlog" | "in_progress" | "review" | "done";
 export type TicketType = "feature" | "bug" | "improvement" | "check";
+export type PdcaStage = "plan" | "design" | "do" | "check" | "report";
+export type AutoMode = "manual" | "after_plan" | "full";
+export type CommitMode = "none" | "commit" | "commit_push" | "commit_push_pr";
 
 export interface Ticket {
   id: string;
@@ -18,6 +21,9 @@ export interface Ticket {
   reworkCount: number;
   lastReworkRequest: string | null;
   resultSummary: string | null;
+  pdcaStage: PdcaStage | string | null;
+  autoMode: AutoMode | string;
+  commitMode: CommitMode | string;
   projectName?: string; // Feature 3: 전체 보기 시 포함
   createdAt: string;
   updatedAt: string;

@@ -71,6 +71,9 @@ model Ticket {
   reworkCount       Int      @default(0)
   lastReworkRequest String?
   resultSummary     String?  // 작업 결과 요약
+  pdcaStage         String?  // null=일반 티켓, "plan"|"design"|"do"|"check"|"report"=PDCA 티켓 현재 단계
+  autoMode          String   @default("manual")  // manual | after_plan | full
+  commitMode        String   @default("none")    // none | commit | commit_push
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

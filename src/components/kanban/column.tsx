@@ -18,6 +18,7 @@ interface Props {
   showProjectBadge?: boolean;
   onCreate?: (status: TicketStatus) => void;
   onEdit: (t: Ticket) => void;
+  onOpenRunning?: (t: Ticket) => void;
 }
 
 export function KanbanColumn({
@@ -28,6 +29,7 @@ export function KanbanColumn({
   showProjectBadge,
   onCreate,
   onEdit,
+  onOpenRunning,
 }: Props) {
   const { setNodeRef, isOver } = useDroppable({
     id: `col-${status}`,
@@ -79,6 +81,7 @@ export function KanbanColumn({
                 projectId={projectId}
                 showProjectBadge={showProjectBadge}
                 onEdit={onEdit}
+                onOpenRunning={onOpenRunning}
               />
             ))
           )}

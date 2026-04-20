@@ -10,6 +10,7 @@ interface Props {
   projectId: string;
   showProjectBadge?: boolean;
   onEdit: (t: Ticket) => void;
+  onOpenRunning?: (t: Ticket) => void;
 }
 
 export function SortableTicket({
@@ -17,6 +18,7 @@ export function SortableTicket({
   projectId,
   showProjectBadge,
   onEdit,
+  onOpenRunning,
 }: Props) {
   const {
     attributes,
@@ -42,6 +44,7 @@ export function SortableTicket({
         projectId={projectId}
         showProjectBadge={showProjectBadge}
         onEdit={onEdit}
+        onOpenRunning={onOpenRunning}
         dragHandleProps={{ ...attributes, ...listeners }}
         isDragging={isDragging}
       />
