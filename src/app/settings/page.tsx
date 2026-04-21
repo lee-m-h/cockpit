@@ -1,4 +1,5 @@
 import { ThemeSettings } from "@/components/settings/theme-settings";
+import { AppearanceSettings } from "@/components/settings/appearance-settings";
 import { TerminalSettings } from "@/components/settings/terminal-settings";
 import { JiraSettings } from "@/components/settings/jira-settings";
 
@@ -8,6 +9,7 @@ export default function SettingsPage() {
       <div className="max-w-2xl mx-auto p-6 space-y-6">
         <h1 className="text-lg font-semibold">Settings</h1>
         <ThemeSettings />
+        <AppearanceSettings />
         <TerminalSettings />
         <JiraSettings />
       </div>

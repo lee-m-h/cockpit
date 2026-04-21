@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
+import { useTerminalStore } from "@/store/terminal-store";
 import {
   ExternalLink,
   Terminal as TerminalIcon,
@@ -182,8 +183,12 @@ export function FileViewerPanel({
 }
 
 function MarkdownContent({ content }: { content: string }) {
+  const fontSize = useTerminalStore((s) => s.markdownFontSize);
   return (
-    <div className="markdown-body p-6 text-sm text-[var(--color-foreground)]">
+    <div
+      className="markdown-body p-6 text-[var(--color-foreground)]"
+      style={{ fontSize }}
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{

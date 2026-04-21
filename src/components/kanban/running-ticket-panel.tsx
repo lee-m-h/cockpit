@@ -14,6 +14,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useTerminalStore } from "@/store/terminal-store";
+// markdown fontSize 공유 (Settings에서 조절)
 import { useUpdateTicket } from "@/hooks/use-tickets";
 import { useTicketDoc, type DocType } from "@/hooks/use-ticket-doc";
 import { useQueryClient } from "@tanstack/react-query";
@@ -77,6 +78,7 @@ export function RunningTicketPanel({ ticket, projectId, onClose }: Props) {
   const setActiveTab = useTerminalStore((s) => s.setActiveTab);
   const tabs = useTerminalStore((s) => s.tabs);
   const updateMut = useUpdateTicket(projectId);
+  const markdownFontSize = useTerminalStore((s) => s.markdownFontSize);
   const qc = useQueryClient();
   const [advancing, setAdvancing] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -432,7 +434,10 @@ export function RunningTicketPanel({ ticket, projectId, onClose }: Props) {
                 확인 중…
               </div>
             ) : docQuery.data?.content ? (
-              <div className="markdown-body text-xs max-h-80 overflow-y-auto pr-1">
+              <div
+                className="markdown-body max-h-80 overflow-y-auto pr-1"
+                style={{ fontSize: markdownFontSize }}
+              >
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{

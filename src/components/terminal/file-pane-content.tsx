@@ -32,6 +32,7 @@ export function FilePaneContent({ paneId, initialPath }: Props) {
   const setFilePath = useTerminalStore((s) => s.setFilePath);
   const addRecentFile = useTerminalStore((s) => s.addRecentFile);
   const recentFiles = useTerminalStore((s) => s.recentFiles);
+  const markdownFontSize = useTerminalStore((s) => s.markdownFontSize);
   const [input, setInput] = useState(initialPath);
   const [currentPath, setCurrentPath] = useState(initialPath);
   const [data, setData] = useState<FileResponse | null>(null);
@@ -269,7 +270,10 @@ export function FilePaneContent({ paneId, initialPath }: Props) {
             바이너리 파일은 표시할 수 없습니다.
           </div>
         ) : isMarkdown && renderMode === "rendered" ? (
-          <div className="markdown-body p-6 text-sm text-[var(--color-foreground)]">
+          <div
+            className="markdown-body p-6 text-[var(--color-foreground)]"
+            style={{ fontSize: markdownFontSize }}
+          >
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{

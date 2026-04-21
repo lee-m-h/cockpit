@@ -58,7 +58,12 @@ export function TerminalPane({ pane, isActive, onFocus }: TerminalPaneProps) {
 
   const splitPane = useTerminalStore((s) => s.splitPane);
   const closePane = useTerminalStore((s) => s.closePane);
+  const fontSize = useTerminalStore((s) => s.terminalFontSize);
   const dnd = usePaneDnd(pane.id);
+
+  // 생성 시점에만 초기값을 쓰도록 ref로 분리 — 변경은 별도 effect에서 동적으로 반영
+  const fontSizeRef = useRef(fontSize);
+  fontSizeRef.current = fontSize;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -66,7 +71,7 @@ export function TerminalPane({ pane, isActive, onFocus }: TerminalPaneProps) {
     const term = new Terminal({
       theme: XTERM_THEME,
       fontFamily: '"JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace',
-      fontSize: 13,
+      fontSize: fontSizeRef.current,
       lineHeight: 1.2,
       cursorBlink: true,
       cursorStyle: "bar",
@@ -165,6 +170,15 @@ export function TerminalPane({ pane, isActive, onFocus }: TerminalPaneProps) {
       termRef.current.focus();
     }
   }, [isActive]);
+
+  // 설정에서 폰트 크기 바뀌면 실시간 반영 + fit으로 열/행 재계산
+  useEffect(() => {
+    const term = termRef.current;
+    const fit = fitRef.current;
+    if (!term) return;
+    term.options.fontSize = fontSize;
+    fit?.fit();
+  }, [fontSize]);
 
   return (
     <div

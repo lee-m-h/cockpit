@@ -24,6 +24,9 @@ interface TerminalState {
   recentFiles: string[];
   /** 브라우저에서 방문했던 최근 URL들 (최신 먼저, 최대 10개) */
   recentUrls: string[];
+  /** UI 선호도 — 각 탭별 본문 폰트 크기 (px) */
+  terminalFontSize: number;
+  markdownFontSize: number;
 
   createTab: (opts?: {
     cwd?: string;
@@ -51,6 +54,10 @@ interface TerminalState {
   addRecentFile: (filePath: string) => void;
   /** 최근 URL 히스토리에 URL 추가 (브라우저 이동 시 호출) */
   addRecentUrl: (url: string) => void;
+  /** 터미널 폰트 크기 설정 */
+  setTerminalFontSize: (px: number) => void;
+  /** 마크다운 뷰 폰트 크기 설정 */
+  setMarkdownFontSize: (px: number) => void;
 
   /** 탭 복제 — 동일한 type/url/cwd로 새 탭 생성 */
   duplicateTab: (tabId: string) => Promise<string | null>;
@@ -405,6 +412,8 @@ export const useTerminalStore = create<TerminalState>()(
       hydrated: false,
       recentFiles: [],
       recentUrls: [],
+      terminalFontSize: 13,
+      markdownFontSize: 14,
 
       createTab: async (opts) => {
         const res = await createPty(opts);
@@ -561,6 +570,16 @@ export const useTerminalStore = create<TerminalState>()(
           const filtered = s.recentUrls.filter((x) => x !== u);
           return { recentUrls: [u, ...filtered].slice(0, 10) };
         });
+      },
+
+      setTerminalFontSize: (px) => {
+        const v = Math.min(Math.max(Math.round(px), 8), 32);
+        set({ terminalFontSize: v });
+      },
+
+      setMarkdownFontSize: (px) => {
+        const v = Math.min(Math.max(Math.round(px), 10), 32);
+        set({ markdownFontSize: v });
       },
 
       reorderPanes: (sourceId, targetId) => {
@@ -735,6 +754,8 @@ export const useTerminalStore = create<TerminalState>()(
         activeTabId: s.activeTabId,
         recentFiles: s.recentFiles,
         recentUrls: s.recentUrls,
+        terminalFontSize: s.terminalFontSize,
+        markdownFontSize: s.markdownFontSize,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
