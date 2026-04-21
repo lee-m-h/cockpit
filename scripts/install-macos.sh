@@ -96,10 +96,12 @@ fi
 
 # ─── 6. 마운트 + 복사 + 언마운트 ──────────────────────────────
 log "DMG 마운트…"
-ATTACH_OUT="$(hdiutil attach -nobrowse -quiet "$DMG_PATH")"
-MOUNT_POINT="$(echo "$ATTACH_OUT" | tail -1 | awk '{for (i=3; i<=NF; i++) printf "%s%s", $i, (i<NF ? " " : ""); print ""}')"
+# -quiet 빼야 마운트 포인트 파싱 가능. awk 대신 grep -o로 /Volumes/ 경로 추출(공백 포함 안전).
+ATTACH_OUT="$(hdiutil attach -nobrowse "$DMG_PATH" 2>&1)"
+MOUNT_POINT="$(echo "$ATTACH_OUT" | grep -o '/Volumes/[^[:cntrl:]]*' | tail -1)"
 if [[ -z "${MOUNT_POINT:-}" || ! -d "$MOUNT_POINT" ]]; then
-  err "마운트 실패: $ATTACH_OUT"
+  err "마운트 실패:"
+  echo "$ATTACH_OUT"
   exit 1
 fi
 log "마운트 위치: $MOUNT_POINT"
