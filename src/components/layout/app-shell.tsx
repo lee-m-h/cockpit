@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Sidebar } from "./sidebar";
+import { UpdateBanner } from "./update-banner";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/ui-store";
 import { useTerminalStore } from "@/store/terminal-store";
@@ -98,6 +99,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen w-screen overflow-hidden bg-[var(--color-background)] text-[var(--color-foreground)]">
       <Sidebar />
       <main className="flex-1 min-w-0 min-h-0 relative flex flex-col">
+        <UpdateBanner />
         {/* 페이지 컨텐츠 — 터미널 라우트일 때는 숨김 */}
         <div
           className={cn(

@@ -1,10 +1,13 @@
-import { app, BrowserWindow, Menu, shell, dialog } from "electron";
-import { spawn, type ChildProcess } from "child_process";
+import { app, BrowserWindow, Menu, shell, dialog, ipcMain } from "electron";
+import { spawn, execFile, type ChildProcess } from "child_process";
+import { promisify } from "node:util";
 import * as path from "path";
 import * as http from "http";
 import * as fs from "fs";
 import * as net from "net";
 import * as os from "os";
+
+const execFileAsync = promisify(execFile);
 
 // 앱 이름 및 Bundle ID (macOS 알림 센터/Launchpad 등록에 사용)
 app.setName("Cockpit");
@@ -530,8 +533,105 @@ async function installCockpitIfNeeded(): Promise<void> {
   });
 }
 
+// ─── 자동 업데이트 체크 (백그라운드) ──────────────────────────
+
+type UpdateStatus = "idle" | "checking" | "updating" | "ready" | "failed";
+let updateStatus: UpdateStatus = "idle";
+let updateError: string | null = null;
+
+function setUpdateStatus(s: UpdateStatus, err: string | null = null) {
+  updateStatus = s;
+  updateError = err;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("cockpit:update-status", s);
+  }
+}
+
+/** 원격과 현재 HEAD 비교 — 가져올 커밋 있으면 true */
+async function hasRemoteUpdates(cwd: string): Promise<boolean> {
+  try {
+    await execFileAsync("git", ["fetch", "--quiet", "origin", "main"], {
+      cwd,
+      env: buildSpawnEnv(),
+      timeout: 10_000,
+    });
+    const { stdout } = await execFileAsync(
+      "git",
+      ["rev-list", "--count", "HEAD..origin/main"],
+      { cwd, env: buildSpawnEnv(), timeout: 5_000 },
+    );
+    return Number(stdout.trim()) > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function runSpawn(
+  cmd: string,
+  args: string[],
+  cwd: string,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, {
+      cwd,
+      env: buildSpawnEnv(),
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: process.platform === "win32",
+    });
+    let stderr = "";
+    child.stderr?.on("data", (d: Buffer) => {
+      stderr += d.toString();
+    });
+    child.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`${cmd} ${args.join(" ")} exited ${code}\n${stderr}`));
+    });
+    child.on("error", reject);
+  });
+}
+
+async function checkAndApplyUpdateBackground(): Promise<void> {
+  // 개발 모드에선 자동 업데이트 스킵 (소스 직접 수정 중인 경우 충돌 방지)
+  if (!app.isPackaged) return;
+  // 환경변수로 꺼둘 수 있게
+  if (process.env.COCKPIT_NO_AUTO_UPDATE === "1") return;
+  // git repo가 아니면 스킵
+  if (!fs.existsSync(path.join(ROOT, ".git"))) return;
+
+  try {
+    setUpdateStatus("checking");
+    const hasUpdates = await hasRemoteUpdates(ROOT);
+    if (!hasUpdates) {
+      setUpdateStatus("idle");
+      return;
+    }
+
+    setUpdateStatus("updating");
+    await runSpawn("git", ["pull", "--ff-only", "origin", "main"], ROOT);
+    await runSpawn("pnpm", ["install", "--prod=false"], ROOT);
+    await runSpawn("pnpm", ["prisma", "generate"], ROOT);
+    // 마이그레이션은 실패해도 빌드는 진행 (대부분의 업데이트엔 없음)
+    await runSpawn("pnpm", ["prisma", "migrate", "deploy"], ROOT).catch(
+      () => {},
+    );
+    await runSpawn("pnpm", ["build"], ROOT);
+
+    setUpdateStatus("ready");
+  } catch (err) {
+    console.error("[cockpit] 자동 업데이트 실패:", err);
+    setUpdateStatus("failed", (err as Error).message);
+  }
+}
+
 // ─── 앱 라이프사이클 ─────────────────────────────────────────
 app.whenReady().then(async () => {
+  // IPC 브릿지 — renderer의 UpdateBanner에서 사용
+  ipcMain.handle("cockpit:get-update-status", () => updateStatus);
+  ipcMain.handle("cockpit:get-update-error", () => updateError);
+  ipcMain.handle("cockpit:apply-update", () => {
+    app.relaunch();
+    app.exit(0);
+  });
   buildMenu();
 
   // 최초 실행 시 소스 자동 설치
@@ -558,6 +658,12 @@ app.whenReady().then(async () => {
     await waitForServer();
     console.log(`[cockpit] 서버 준비 완료!`);
     createWindow();
+    // 창 로드 완료 후 백그라운드로 업데이트 체크 (2초 지연 — 초기 렌더 방해 방지)
+    setTimeout(() => {
+      checkAndApplyUpdateBackground().catch((err) =>
+        console.warn("[cockpit] updater:", (err as Error).message),
+      );
+    }, 2000);
   } catch (err) {
     console.error("[cockpit] 서버 시작 실패:", err);
     // 에러 상세 표시 (stderr 수집 포함)
