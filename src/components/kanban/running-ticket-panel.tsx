@@ -12,6 +12,7 @@ import {
   Copy,
   FileText,
   ChevronRight,
+  Activity,
 } from "lucide-react";
 import { useTerminalStore } from "@/store/terminal-store";
 // markdown fontSize 공유 (Settings에서 조절)
@@ -467,23 +468,24 @@ export function RunningTicketPanel({ ticket, projectId, onClose }: Props) {
           ),
         )}
 
-        <div className="rounded border border-[var(--color-border)] p-2">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <span className="text-[10px] text-[var(--color-foreground-dim)]">
-              액션 타임라인
+        <StageAccordion
+          label="액션 타임라인"
+          icon={Activity}
+          defaultOpen={true}
+          badge={
+            <span className="flex items-center gap-1.5 text-[10px] text-[var(--color-foreground-dim)]">
+              {isRunning && (
+                <span className="flex items-center gap-1 text-blue-400">
+                  <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse" />
+                  live
+                </span>
+              )}
+              <span>{actions.length}건</span>
             </span>
-            {isRunning && (
-              <span className="flex items-center gap-1 text-[10px] text-blue-400">
-                <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse" />
-                live
-              </span>
-            )}
-            <span className="ml-auto text-[10px] text-[var(--color-foreground-dim)]">
-              {actions.length}건
-            </span>
-          </div>
+          }
+        >
           <ActionTimeline actions={actions} />
-        </div>
+        </StageAccordion>
 
         <details className="rounded border border-[var(--color-border)] p-2">
           <summary className="flex items-center gap-1.5 cursor-pointer list-none">
@@ -564,11 +566,13 @@ function StageAccordion({
   label,
   defaultOpen,
   badge,
+  icon: Icon = FileText,
   children,
 }: {
   label: string;
   defaultOpen: boolean;
   badge?: React.ReactNode;
+  icon?: React.ComponentType<{ size?: number; className?: string }>;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -585,10 +589,7 @@ function StageAccordion({
             open ? "rotate-90" : ""
           }`}
         />
-        <FileText
-          size={11}
-          className="text-[var(--color-foreground-dim)]"
-        />
+        <Icon size={11} className="text-[var(--color-foreground-dim)]" />
         <span className="text-[10px] text-[var(--color-foreground-muted)] flex-1 text-left">
           {label}
         </span>
