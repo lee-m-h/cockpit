@@ -41,3 +41,4 @@ logs/
 # electron
 dist-electron/
 dist-app/
+dist-app.noindex/

@@ -25,7 +25,7 @@
     "productName": "Cockpit",
     "asar": true,
     "directories": {
-      "output": "dist-app",
+      "output": "dist-app.noindex",
       "buildResources": "build"
     },
     "files": [
