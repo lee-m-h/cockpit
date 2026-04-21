@@ -36,23 +36,39 @@ else
   log "감지된 아키텍처: Intel ($ARCH)"
 fi
 
-# ─── 2. Node.js 체크 ──────────────────────────────────────────
+# ─── 2. Node.js 체크 — 없으면 nvm으로 자동 설치 ───────────────
+need_install_node=0
 if ! command -v node >/dev/null 2>&1; then
-  err "Node.js가 설치되어 있지 않습니다. Node 20 이상 필요합니다."
-  echo ""
-  echo "  설치 방법:"
-  echo "    brew install node         # Homebrew가 있을 때"
-  echo "    또는 https://nodejs.org 에서 LTS 버전 다운로드"
-  echo ""
-  echo "  설치 후 다시 실행해주세요:"
-  echo "    curl -fsSL https://raw.githubusercontent.com/$REPO/main/scripts/install-macos.sh | bash"
-  exit 1
+  log "Node.js가 설치되어 있지 않습니다. nvm으로 자동 설치합니다…"
+  need_install_node=1
+else
+  NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
+  if [[ "$NODE_MAJOR" -lt 20 ]]; then
+    warn "Node $(node -v) 감지됨 (Node 20+ 필요). 최신 LTS를 추가 설치합니다."
+    need_install_node=1
+  fi
 fi
-NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
-if [[ "$NODE_MAJOR" -lt 20 ]]; then
-  err "Node 20 이상이 필요합니다. 현재 버전: $(node -v)"
-  echo "  brew upgrade node 또는 https://nodejs.org 에서 최신 LTS 설치 후 다시 시도하세요."
-  exit 1
+
+if [[ "$need_install_node" == "1" ]]; then
+  # nvm 설치 (없을 때만) — 비밀번호 불필요, 사용자 홈(~/.nvm)에만 설치
+  if [[ ! -s "$HOME/.nvm/nvm.sh" ]]; then
+    log "nvm 설치 중…"
+    curl -fsSL -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+  fi
+
+  # 현재 쉘에 nvm 로드
+  export NVM_DIR="$HOME/.nvm"
+  # shellcheck disable=SC1091
+  . "$NVM_DIR/nvm.sh"
+
+  log "Node.js 20 LTS 설치 중 (1-2분)…"
+  nvm install --lts=iron >/dev/null
+  nvm alias default lts/iron >/dev/null
+
+  # 현재 프로세스 PATH에 추가 — 이후 node 명령이 바로 동작하도록
+  export PATH="$NVM_DIR/versions/node/$(nvm version)/bin:$PATH"
+
+  log "Node.js $(node -v) 설치 완료"
 fi
 log "Node.js $(node -v) 확인됨"
 
