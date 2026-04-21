@@ -20,6 +20,10 @@ interface TerminalState {
   tabs: TerminalTab[];
   activeTabId: string | null;
   hydrated: boolean; // persist 복원 완료 플래그
+  /** 파일 뷰어에서 성공적으로 열었던 최근 경로들 (최신 먼저, 최대 10개) */
+  recentFiles: string[];
+  /** 브라우저에서 방문했던 최근 URL들 (최신 먼저, 최대 10개) */
+  recentUrls: string[];
 
   createTab: (opts?: {
     cwd?: string;
@@ -43,6 +47,10 @@ interface TerminalState {
   createFileTab: (filePath?: string, tabName?: string) => string;
   /** 파일 뷰어 경로 갱신 */
   setFilePath: (id: string, filePath: string) => void;
+  /** 최근 파일 히스토리에 경로 추가 (파일 로드 성공 후 호출) */
+  addRecentFile: (filePath: string) => void;
+  /** 최근 URL 히스토리에 URL 추가 (브라우저 이동 시 호출) */
+  addRecentUrl: (url: string) => void;
 
   /** 탭 복제 — 동일한 type/url/cwd로 새 탭 생성 */
   duplicateTab: (tabId: string) => Promise<string | null>;
@@ -395,6 +403,8 @@ export const useTerminalStore = create<TerminalState>()(
       tabs: [],
       activeTabId: null,
       hydrated: false,
+      recentFiles: [],
+      recentUrls: [],
 
       createTab: async (opts) => {
         const res = await createPty(opts);
@@ -534,6 +544,24 @@ export const useTerminalStore = create<TerminalState>()(
             root: updateFilePanePath(t.root, id, filePath),
           })),
         })),
+
+      addRecentFile: (filePath) => {
+        const p = filePath.trim();
+        if (!p) return;
+        set((s) => {
+          const filtered = s.recentFiles.filter((x) => x !== p);
+          return { recentFiles: [p, ...filtered].slice(0, 10) };
+        });
+      },
+
+      addRecentUrl: (url) => {
+        const u = url.trim();
+        if (!u) return;
+        set((s) => {
+          const filtered = s.recentUrls.filter((x) => x !== u);
+          return { recentUrls: [u, ...filtered].slice(0, 10) };
+        });
+      },
 
       reorderPanes: (sourceId, targetId) => {
         if (sourceId === targetId) return;
@@ -702,7 +730,12 @@ export const useTerminalStore = create<TerminalState>()(
     }),
     {
       name: "cockpit-terminal-store",
-      partialize: (s) => ({ tabs: s.tabs, activeTabId: s.activeTabId }),
+      partialize: (s) => ({
+        tabs: s.tabs,
+        activeTabId: s.activeTabId,
+        recentFiles: s.recentFiles,
+        recentUrls: s.recentUrls,
+      }),
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.hydrated = true;

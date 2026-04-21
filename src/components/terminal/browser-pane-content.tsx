@@ -9,6 +9,8 @@ import {
   ExternalLink,
   AlertTriangle,
   Wrench,
+  Clock,
+  X as XIcon,
 } from "lucide-react";
 import { useTerminalStore } from "@/store/terminal-store";
 
@@ -37,13 +39,18 @@ function normalizeUrl(input: string): string {
 /** 공용 브라우저 본체 — 탭/분할 panes 양쪽에서 사용 */
 export function BrowserContent({ paneId, initialUrl }: Props) {
   const setBrowserUrl = useTerminalStore((s) => s.setBrowserUrl);
+  const addRecentUrl = useTerminalStore((s) => s.addRecentUrl);
+  const recentUrls = useTerminalStore((s) => s.recentUrls);
   const [input, setInput] = useState(initialUrl);
   const [currentUrl, setCurrentUrl] = useState(initialUrl);
   const [blocked, setBlocked] = useState(false);
+  const [showRecent, setShowRecent] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const webviewContainerRef = useRef<HTMLDivElement>(null);
   // Electron webview element (imperative)
   const webviewRef = useRef<HTMLElement | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const recentBoxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setInput(initialUrl);
@@ -102,7 +109,26 @@ export function BrowserContent({ paneId, initialUrl }: Props) {
     setBrowserUrl(paneId, url);
     setInput(url);
     setBlocked(false);
+    setShowRecent(false);
+    addRecentUrl(url);
   };
+
+  // 드롭다운 바깥 클릭 시 닫기
+  useEffect(() => {
+    if (!showRecent) return;
+    const onDown = (e: MouseEvent) => {
+      if (
+        recentBoxRef.current &&
+        !recentBoxRef.current.contains(e.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target as Node)
+      ) {
+        setShowRecent(false);
+      }
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [showRecent]);
 
   const reload = () => {
     if (IS_ELECTRON && webviewRef.current) {
@@ -175,7 +201,7 @@ export function BrowserContent({ paneId, initialUrl }: Props) {
   return (
     <div className="flex flex-col h-full min-h-0 bg-[var(--color-background)]">
       {/* 주소창 */}
-      <div className="flex items-center gap-1 h-9 px-2 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+      <div className="relative flex items-center gap-1 h-9 px-2 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
         <button
           onClick={goBack}
           className="p-1 rounded text-[var(--color-foreground-dim)] hover:bg-[var(--color-surface-hover)]"
@@ -201,14 +227,86 @@ export function BrowserContent({ paneId, initialUrl }: Props) {
           <div className="flex-1 flex items-center gap-1 px-2 h-7 rounded bg-[var(--color-background)] border border-[var(--color-border)] focus-within:border-[var(--color-accent)]">
             <Globe size={12} className="text-[var(--color-foreground-dim)]" />
             <input
+              ref={inputRef}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onFocus={() => recentUrls.length > 0 && setShowRecent(true)}
               placeholder="URL 입력 또는 검색어"
               className="flex-1 bg-transparent text-xs text-[var(--color-foreground)] outline-none"
             />
+            {recentUrls.length > 0 && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setShowRecent((v) => !v)}
+                className="p-0.5 rounded text-[var(--color-foreground-dim)] hover:bg-[var(--color-surface-hover)]"
+                title="최근 URL"
+                aria-label="최근 URL"
+              >
+                <Clock size={12} />
+              </button>
+            )}
           </div>
         </form>
+
+        {showRecent && recentUrls.length > 0 && (
+          <div
+            ref={recentBoxRef}
+            className="absolute left-14 right-14 top-9 z-30 mt-0.5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg overflow-hidden"
+          >
+            <div className="flex items-center justify-between px-2 py-1 border-b border-[var(--color-border)]">
+              <span className="text-[10px] text-[var(--color-foreground-dim)]">
+                최근 URL ({recentUrls.length})
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowRecent(false)}
+                className="p-0.5 rounded text-[var(--color-foreground-dim)] hover:bg-[var(--color-surface-hover)]"
+                aria-label="닫기"
+              >
+                <XIcon size={11} />
+              </button>
+            </div>
+            <ul className="max-h-80 overflow-y-auto">
+              {recentUrls.map((u) => {
+                let host = u;
+                let rest = "";
+                try {
+                  const parsed = new URL(u);
+                  host = parsed.host;
+                  rest = parsed.pathname + parsed.search;
+                } catch {
+                  // 검색 쿼리 등 URL이 아니면 그대로 표시
+                }
+                return (
+                  <li key={u}>
+                    <button
+                      type="button"
+                      onClick={() => go(u)}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-left hover:bg-[var(--color-surface-hover)]"
+                    >
+                      <Globe
+                        size={11}
+                        className="text-[var(--color-foreground-dim)] shrink-0"
+                      />
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-xs text-[var(--color-foreground)] truncate">
+                          {host}
+                        </span>
+                        {rest && rest !== "/" && (
+                          <span className="block text-[10px] text-[var(--color-foreground-dim)] font-mono truncate">
+                            {rest}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
         <button
           onClick={openExternal}
           className="p-1 rounded text-[var(--color-foreground-dim)] hover:bg-[var(--color-surface-hover)]"

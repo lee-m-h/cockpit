@@ -8,6 +8,8 @@ import {
   FileCode,
   ExternalLink,
   FolderOpen,
+  Clock,
+  X as XIcon,
 } from "lucide-react";
 import { useTerminalStore } from "@/store/terminal-store";
 import { cn } from "@/lib/utils";
@@ -28,14 +30,18 @@ interface Props {
 
 export function FilePaneContent({ paneId, initialPath }: Props) {
   const setFilePath = useTerminalStore((s) => s.setFilePath);
+  const addRecentFile = useTerminalStore((s) => s.addRecentFile);
+  const recentFiles = useTerminalStore((s) => s.recentFiles);
   const [input, setInput] = useState(initialPath);
   const [currentPath, setCurrentPath] = useState(initialPath);
   const [data, setData] = useState<FileResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showRecent, setShowRecent] = useState(false);
   const isMarkdown = /\.(md|markdown|mdx)$/i.test(data?.name ?? "");
   const [renderMode, setRenderMode] = useState<"rendered" | "source">("source");
   const inputRef = useRef<HTMLInputElement>(null);
+  const recentBoxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setInput(initialPath);
@@ -65,6 +71,8 @@ export function FilePaneContent({ paneId, initialPath }: Props) {
           setRenderMode(
             /\.(md|markdown|mdx)$/i.test(body.name) ? "rendered" : "source",
           );
+          // 정상적으로 로드된 파일만 최근 목록에 추가 (절대 경로 우선)
+          addRecentFile(body.absolutePath || currentPath);
         }
       })
       .catch((err) => {
@@ -81,9 +89,28 @@ export function FilePaneContent({ paneId, initialPath }: Props) {
   const go = (raw: string) => {
     const p = raw.trim();
     if (!p) return;
+    setInput(p);
     setCurrentPath(p);
     setFilePath(paneId, p);
+    setShowRecent(false);
   };
+
+  // 드롭다운 바깥 클릭 시 닫기
+  useEffect(() => {
+    if (!showRecent) return;
+    const onDown = (e: MouseEvent) => {
+      if (
+        recentBoxRef.current &&
+        !recentBoxRef.current.contains(e.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target as Node)
+      ) {
+        setShowRecent(false);
+      }
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [showRecent]);
 
   const openInOS = async () => {
     if (!data?.absolutePath) return;
@@ -102,7 +129,7 @@ export function FilePaneContent({ paneId, initialPath }: Props) {
   return (
     <div className="flex flex-col h-full min-h-0 bg-[var(--color-background)]">
       {/* 경로 바 */}
-      <div className="flex items-center gap-1 h-9 px-2 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+      <div className="relative flex items-center gap-1 h-9 px-2 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
         <form onSubmit={onSubmit} className="flex-1 flex items-center gap-1">
           <div className="flex-1 flex items-center gap-1 px-2 h-7 rounded bg-[var(--color-background)] border border-[var(--color-border)] focus-within:border-[var(--color-accent)]">
             <FolderOpen
@@ -114,11 +141,75 @@ export function FilePaneContent({ paneId, initialPath }: Props) {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onFocus={() => recentFiles.length > 0 && setShowRecent(true)}
               placeholder="파일 경로 (예: ~/Documents/note.md)"
               className="flex-1 bg-transparent text-xs text-[var(--color-foreground)] outline-none font-mono"
             />
+            {recentFiles.length > 0 && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setShowRecent((v) => !v)}
+                className="p-0.5 rounded text-[var(--color-foreground-dim)] hover:bg-[var(--color-surface-hover)]"
+                title="최근 파일"
+                aria-label="최근 파일"
+              >
+                <Clock size={12} />
+              </button>
+            )}
           </div>
         </form>
+
+        {showRecent && recentFiles.length > 0 && (
+          <div
+            ref={recentBoxRef}
+            className="absolute left-2 right-2 top-9 z-30 mt-0.5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg overflow-hidden"
+          >
+            <div className="flex items-center justify-between px-2 py-1 border-b border-[var(--color-border)]">
+              <span className="text-[10px] text-[var(--color-foreground-dim)]">
+                최근 파일 ({recentFiles.length})
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowRecent(false)}
+                className="p-0.5 rounded text-[var(--color-foreground-dim)] hover:bg-[var(--color-surface-hover)]"
+                aria-label="닫기"
+              >
+                <XIcon size={11} />
+              </button>
+            </div>
+            <ul className="max-h-80 overflow-y-auto">
+              {recentFiles.map((p) => {
+                const name = p.split("/").pop() || p;
+                const dir = p.slice(0, p.length - name.length - 1);
+                return (
+                  <li key={p}>
+                    <button
+                      type="button"
+                      onClick={() => go(p)}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-left hover:bg-[var(--color-surface-hover)]"
+                    >
+                      <FileText
+                        size={11}
+                        className="text-[var(--color-foreground-dim)] shrink-0"
+                      />
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-xs text-[var(--color-foreground)] truncate">
+                          {name}
+                        </span>
+                        {dir && (
+                          <span className="block text-[10px] text-[var(--color-foreground-dim)] font-mono truncate">
+                            {dir}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
         {isMarkdown && (
           <div className="flex items-center gap-0 rounded-md border border-[var(--color-border)] overflow-hidden">
             <button
