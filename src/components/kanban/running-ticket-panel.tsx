@@ -492,11 +492,22 @@ export function RunningTicketPanel({ ticket, projectId, onClose }: Props) {
           </div>
         ) : null}
 
-        <StageAccordion
-          label="액션 타임라인"
-          icon={Activity}
-          defaultOpen={true}
-          badge={
+        <details
+          open
+          className="rounded border border-[var(--color-border)] group"
+        >
+          <summary className="flex items-center gap-1.5 cursor-pointer list-none px-2 py-1.5 hover:bg-[var(--color-surface-hover)]">
+            <ChevronRight
+              size={11}
+              className="text-[var(--color-foreground-dim)] transition-transform group-open:rotate-90"
+            />
+            <Activity
+              size={11}
+              className="text-[var(--color-foreground-dim)]"
+            />
+            <span className="text-[10px] text-[var(--color-foreground-muted)] flex-1">
+              액션 타임라인
+            </span>
             <span className="flex items-center gap-1.5 text-[10px] text-[var(--color-foreground-dim)]">
               {isRunning && (
                 <span className="flex items-center gap-1 text-blue-400">
@@ -506,10 +517,11 @@ export function RunningTicketPanel({ ticket, projectId, onClose }: Props) {
               )}
               <span>{actions.length}건</span>
             </span>
-          }
-        >
-          <ActionTimeline actions={actions} />
-        </StageAccordion>
+          </summary>
+          <div className="p-2 border-t border-[var(--color-border)]">
+            <ActionTimeline actions={actions} />
+          </div>
+        </details>
 
         <details className="rounded border border-[var(--color-border)] p-2">
           <summary className="flex items-center gap-1.5 cursor-pointer list-none">
@@ -585,42 +597,4 @@ export function RunningTicketPanel({ ticket, projectId, onClose }: Props) {
   );
 }
 
-/** 일반 아코디언 래퍼 — header 클릭으로 접기/펼치기 */
-function StageAccordion({
-  label,
-  defaultOpen,
-  badge,
-  icon: Icon = FileText,
-  children,
-}: {
-  label: string;
-  defaultOpen: boolean;
-  badge?: React.ReactNode;
-  icon?: React.ComponentType<{ size?: number; className?: string }>;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="rounded border border-[var(--color-border)] overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-1.5 px-2 py-1.5 hover:bg-[var(--color-surface-hover)]"
-      >
-        <ChevronRight
-          size={11}
-          className={`text-[var(--color-foreground-dim)] transition-transform ${
-            open ? "rotate-90" : ""
-          }`}
-        />
-        <Icon size={11} className="text-[var(--color-foreground-dim)]" />
-        <span className="text-[10px] text-[var(--color-foreground-muted)] flex-1 text-left">
-          {label}
-        </span>
-        {badge}
-      </button>
-      {open && <div className="p-2 border-t border-[var(--color-border)]">{children}</div>}
-    </div>
-  );
-}
 
