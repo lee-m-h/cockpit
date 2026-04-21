@@ -59,11 +59,11 @@ function isPdcaStage(value: unknown): value is PdcaStage {
   );
 }
 
-function formatElapsed(startedAt: string | null): string {
+function formatElapsed(startedAt: string | null, endAt?: number): string {
   if (!startedAt) return "—";
   const start = new Date(startedAt).getTime();
-  const now = Date.now();
-  const sec = Math.max(0, Math.floor((now - start) / 1000));
+  const end = endAt ?? Date.now();
+  const sec = Math.max(0, Math.floor((end - start) / 1000));
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   const s = sec % 60;
@@ -86,8 +86,27 @@ export function RunningTicketPanel({ ticket, projectId, onClose }: Props) {
   const stage = isPdcaStage(ticket.pdcaStage) ? ticket.pdcaStage : null;
   const isLastStage = stage === "report";
   const isRunning = ticket.status === "in_progress";
-  const stageDoc = stage ? STAGE_DOC[stage] : null;
-  const docQuery = useTicketDoc(ticket.id, stageDoc?.type ?? null);
+
+  // 아코디언 구성: 현재 단계까지 지나온 모든 산출물을 누적 표시.
+  // 이전 단계는 접힘(default closed), 현재 단계는 펼침(default open).
+  const SECTIONS: Array<{
+    key: PdcaStage;
+    label: string;
+    docType?: DocType;
+    file?: string;
+    isChecklist?: boolean;
+  }> = [
+    { key: "plan", label: "Plan", docType: "plan", file: "plan.md" },
+    { key: "design", label: "Design", docType: "design", file: "design.md" },
+    { key: "do", label: "Do · 구현 체크리스트", isChecklist: true },
+    { key: "check", label: "Check", docType: "analysis", file: "analysis.md" },
+    { key: "report", label: "Report", docType: "report", file: "report.md" },
+  ];
+  const currentIdx = stage
+    ? SECTIONS.findIndex((s) => s.key === stage)
+    : -1;
+  const visibleSections =
+    currentIdx >= 0 ? SECTIONS.slice(0, currentIdx + 1) : [];
 
   // 가로폭 리사이즈 (오버레이 형태) — localStorage에 저장하여 세션 간 유지
   const [width, setWidth] = useState<number>(() => {
@@ -150,13 +169,26 @@ export function RunningTicketPanel({ ticket, projectId, onClose }: Props) {
     };
   }, [width]);
 
-  const [elapsed, setElapsed] = useState(() => formatElapsed(ticket.startedAt));
+  // 실행 중(in_progress)일 때만 1초마다 갱신. 끝나면 마지막 값을 고정.
+  //   - completedAt이 있으면 그 시점까지로 정확히 계산
+  //   - 없으면 status=review로 전환된 뒤 처음 본 시점을 종료로 간주(근사)
+  const completedMs = ticket.completedAt
+    ? new Date(ticket.completedAt).getTime()
+    : undefined;
+  const [elapsed, setElapsed] = useState(() =>
+    formatElapsed(ticket.startedAt, isRunning ? undefined : completedMs),
+  );
   useEffect(() => {
+    if (!isRunning) {
+      // 정지 상태: 완료 시각 또는 "지금 1회" 스냅샷으로 고정
+      setElapsed(formatElapsed(ticket.startedAt, completedMs ?? Date.now()));
+      return;
+    }
     const id = setInterval(() => {
       setElapsed(formatElapsed(ticket.startedAt));
     }, 1000);
     return () => clearInterval(id);
-  }, [ticket.startedAt]);
+  }, [ticket.startedAt, isRunning, completedMs]);
 
   // 실시간 로그 스트림 + 액션 타임라인 — SSE 구독
   const [logText, setLogText] = useState("");
@@ -413,55 +445,26 @@ export function RunningTicketPanel({ ticket, projectId, onClose }: Props) {
 
         {stage && <StagesCard ticketId={ticket.id} />}
 
-        {stage === "do" && <ChecklistCard ticketId={ticket.id} />}
-
-        {stageDoc && (
-          <div className="rounded border border-[var(--color-border)] p-2">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <FileText
-                size={11}
-                className="text-[var(--color-foreground-dim)]"
-              />
-              <span className="text-[10px] text-[var(--color-foreground-dim)]">
-                {stageDoc.file}
-              </span>
-              {docQuery.data?.content && (
-                <span className="text-[10px] text-green-400">● 있음</span>
-              )}
-            </div>
-            {docQuery.isLoading ? (
-              <div className="text-[11px] text-[var(--color-foreground-dim)]">
-                확인 중…
-              </div>
-            ) : docQuery.data?.content ? (
-              <div
-                className="markdown-body max-h-80 overflow-y-auto pr-1"
-                style={{ fontSize: markdownFontSize }}
-              >
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    a: ({ href, children, ...props }) => (
-                      <a
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        {...props}
-                      >
-                        {children}
-                      </a>
-                    ),
-                  }}
-                >
-                  {docQuery.data.content}
-                </ReactMarkdown>
-              </div>
-            ) : (
-              <div className="text-[11px] text-[var(--color-foreground-dim)]">
-                아직 작성되지 않았습니다.
-              </div>
-            )}
-          </div>
+        {visibleSections.map((sec) =>
+          sec.isChecklist ? (
+            <StageAccordion
+              key={`${sec.key}-${stage}`}
+              label={sec.label}
+              defaultOpen={stage === sec.key}
+            >
+              <ChecklistCard ticketId={ticket.id} />
+            </StageAccordion>
+          ) : (
+            <StageDocAccordion
+              key={`${sec.key}-${stage}`}
+              ticketId={ticket.id}
+              type={sec.docType!}
+              label={sec.label}
+              file={sec.file!}
+              defaultOpen={stage === sec.key}
+              fontSize={markdownFontSize}
+            />
+          ),
         )}
 
         <div className="rounded border border-[var(--color-border)] p-2">
@@ -553,5 +556,108 @@ export function RunningTicketPanel({ ticket, projectId, onClose }: Props) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** 일반 아코디언 래퍼 — header 클릭으로 접기/펼치기 */
+function StageAccordion({
+  label,
+  defaultOpen,
+  badge,
+  children,
+}: {
+  label: string;
+  defaultOpen: boolean;
+  badge?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="rounded border border-[var(--color-border)] overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-1.5 px-2 py-1.5 hover:bg-[var(--color-surface-hover)]"
+      >
+        <ChevronRight
+          size={11}
+          className={`text-[var(--color-foreground-dim)] transition-transform ${
+            open ? "rotate-90" : ""
+          }`}
+        />
+        <FileText
+          size={11}
+          className="text-[var(--color-foreground-dim)]"
+        />
+        <span className="text-[10px] text-[var(--color-foreground-muted)] flex-1 text-left">
+          {label}
+        </span>
+        {badge}
+      </button>
+      {open && <div className="p-2 border-t border-[var(--color-border)]">{children}</div>}
+    </div>
+  );
+}
+
+/** 단계별 md 문서 아코디언 — useTicketDoc으로 내용 로드 */
+function StageDocAccordion({
+  ticketId,
+  type,
+  label,
+  file,
+  defaultOpen,
+  fontSize,
+}: {
+  ticketId: string;
+  type: DocType;
+  label: string;
+  file: string;
+  defaultOpen: boolean;
+  fontSize: number;
+}) {
+  const { data, isLoading } = useTicketDoc(ticketId, type);
+  return (
+    <StageAccordion
+      label={`${label} · ${file}`}
+      defaultOpen={defaultOpen}
+      badge={
+        data?.content ? (
+          <span className="text-[10px] text-green-400">● 있음</span>
+        ) : null
+      }
+    >
+      {isLoading ? (
+        <div className="text-[11px] text-[var(--color-foreground-dim)]">
+          확인 중…
+        </div>
+      ) : data?.content ? (
+        <div
+          className="markdown-body max-h-80 overflow-y-auto pr-1"
+          style={{ fontSize }}
+        >
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              a: ({ href, children, ...props }) => (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  {...props}
+                >
+                  {children}
+                </a>
+              ),
+            }}
+          >
+            {data.content}
+          </ReactMarkdown>
+        </div>
+      ) : (
+        <div className="text-[11px] text-[var(--color-foreground-dim)]">
+          아직 작성되지 않았습니다.
+        </div>
+      )}
+    </StageAccordion>
   );
 }
