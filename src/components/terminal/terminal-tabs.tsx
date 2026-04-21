@@ -15,6 +15,11 @@ import {
 import { cn } from "@/lib/utils";
 import { ProjectPathPicker } from "@/components/projects/project-path-picker";
 
+const IS_MAC =
+  typeof navigator !== "undefined" &&
+  navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+const TAB_MOD = IS_MAC ? "⌘" : "Alt";
+
 export function TerminalTabs() {
   const tabs = useTerminalStore((s) => s.tabs);
   const activeTabId = useTerminalStore((s) => s.activeTabId);
@@ -111,10 +116,20 @@ export function TerminalTabs() {
                 e.stopPropagation();
                 setEditingTabId(tab.id);
               }}
-              title="더블클릭으로 이름 변경"
+              title={
+                idx < 9
+                  ? `${tab.name} (${TAB_MOD}+${idx + 1}) · 더블클릭으로 이름 변경`
+                  : "더블클릭으로 이름 변경"
+              }
             >
               {tab.name}
             </span>
+          )}
+          {idx < 9 && (
+            <kbd className="text-[10px] text-[var(--color-foreground-dim)] font-mono opacity-60 group-hover:opacity-100">
+              {TAB_MOD}
+              {idx + 1}
+            </kbd>
           )}
           <button
             onClick={(e) => {

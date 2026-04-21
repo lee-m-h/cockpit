@@ -7,7 +7,6 @@ import {
   KanbanSquare,
   GitBranch,
   PanelLeftClose,
-  PanelLeft,
   Plane,
   FolderKanban,
   Settings as SettingsIcon,
@@ -34,7 +33,10 @@ const NAV_ITEMS: NavItem[] = [
 const IS_MAC =
   typeof navigator !== "undefined" &&
   navigator.platform.toUpperCase().indexOf("MAC") >= 0;
-const MOD_KEY = IS_MAC ? "⌘" : "Ctrl";
+// 메뉴 전환 — Mac은 ⌃ 기호(Control), Win/Linux는 "Ctrl" 텍스트
+const MOD_KEY = IS_MAC ? "⌃" : "Ctrl";
+// 사이드바 토글(⌘S / Ctrl+S)용 표시
+const SIDEBAR_MOD = IS_MAC ? "⌘" : "Ctrl";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -49,24 +51,40 @@ export function Sidebar() {
         collapsed ? "w-14" : "w-56",
       )}
     >
-      {/* 헤더: 로고 + 접기 */}
-      <div className="flex items-center justify-between h-14 px-3 border-b border-[var(--color-border)]">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded bg-[var(--color-accent)]/20 flex items-center justify-center flex-shrink-0">
-            <Plane size={18} className="text-[var(--color-accent)]" />
-          </div>
-          {!collapsed && (
-            <span className="font-semibold truncate">Cockpit</span>
-          )}
-        </div>
-        <button
-          onClick={toggle}
-          className="p-1.5 rounded hover:bg-[var(--color-surface-hover)] text-[var(--color-foreground-muted)] flex-shrink-0"
-          aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
-          title={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
-        >
-          {collapsed ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
-        </button>
+      {/* 헤더: 로고 + 접기 — 접힌 상태에선 로고 자체가 펼치기 버튼 */}
+      <div
+        className={cn(
+          "flex items-center h-14 border-b border-[var(--color-border)]",
+          collapsed ? "justify-center px-0" : "justify-between px-3",
+        )}
+      >
+        {collapsed ? (
+          <button
+            onClick={toggle}
+            className="w-10 h-10 rounded bg-[var(--color-accent)]/20 hover:bg-[var(--color-accent)]/30 flex items-center justify-center text-[var(--color-accent)]"
+            aria-label={`사이드바 펼치기 (${SIDEBAR_MOD}+S)`}
+            title={`사이드바 펼치기 (${SIDEBAR_MOD}+S)`}
+          >
+            <Plane size={18} />
+          </button>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded bg-[var(--color-accent)]/20 flex items-center justify-center flex-shrink-0">
+                <Plane size={18} className="text-[var(--color-accent)]" />
+              </div>
+              <span className="font-semibold truncate">Cockpit</span>
+            </div>
+            <button
+              onClick={toggle}
+              className="p-1.5 rounded hover:bg-[var(--color-surface-hover)] text-[var(--color-foreground-muted)] flex-shrink-0"
+              aria-label={`사이드바 접기 (${SIDEBAR_MOD}+S)`}
+              title={`사이드바 접기 (${SIDEBAR_MOD}+S)`}
+            >
+              <PanelLeftClose size={16} />
+            </button>
+          </>
+        )}
       </div>
 
       {/* 내비게이션 */}
@@ -88,7 +106,11 @@ export function Sidebar() {
               )}
               title={
                 collapsed
-                  ? `${item.label} (${MOD_KEY}+${item.shortcut})`
+                  ? `${item.label} (${
+                      IS_MAC
+                        ? `${MOD_KEY}${item.shortcut}`
+                        : `${MOD_KEY}+${item.shortcut}`
+                    })`
                   : undefined
               }
             >
@@ -97,8 +119,9 @@ export function Sidebar() {
                 <>
                   <span className="flex-1">{item.label}</span>
                   <kbd className="text-[10px] text-[var(--color-foreground-dim)] font-mono">
-                    {MOD_KEY}
-                    {item.shortcut}
+                    {IS_MAC
+                      ? `${MOD_KEY}${item.shortcut}`
+                      : `${MOD_KEY}+${item.shortcut}`}
                   </kbd>
                 </>
               )}
