@@ -11,8 +11,16 @@ const ORDER: Array<{ key: StageInfo["stage"]; label: string }> = [
   { key: "report", label: "Report" },
 ];
 
-/** PDCA 5단계의 산출물 존재 여부를 한눈에 보여주는 카드 */
-export function StagesCard({ ticketId }: { ticketId: string }) {
+interface Props {
+  ticketId: string;
+  /** 현재 패널에서 열람 중인 단계 */
+  selected?: StageInfo["stage"] | null;
+  /** done/current 상태의 단계만 클릭 시 호출 */
+  onSelect?: (stage: StageInfo["stage"]) => void;
+}
+
+/** PDCA 5단계의 산출물 존재 여부를 한눈에 보여주는 카드 (탭으로도 동작) */
+export function StagesCard({ ticketId, selected, onSelect }: Props) {
   const { data } = useTicketStages(ticketId);
   const current = data?.currentStage ?? null;
 
@@ -49,44 +57,65 @@ export function StagesCard({ ticketId }: { ticketId: string }) {
           const stage = data?.stages.find((s) => s.stage === o.key);
           const state = getStageState(stage, idx);
           const isLast = idx === ORDER.length - 1;
+          const clickable = state === "done" || state === "current";
+          const isSelected = selected === o.key;
+          const title =
+            stage?.exists && stage.updatedAt
+              ? `${o.label} · ${new Date(stage.updatedAt).toLocaleString()}`
+              : o.label;
+
+          const inner = (
+            <>
+              {state === "done" ? (
+                <Check size={11} className="text-green-400" />
+              ) : state === "current" ? (
+                <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+              ) : (
+                <Circle
+                  size={9}
+                  className="text-[var(--color-foreground-dim)]"
+                />
+              )}
+              <span
+                className={`text-[10px] font-medium ${
+                  state === "current"
+                    ? "text-purple-400"
+                    : state === "done"
+                      ? "text-green-400"
+                      : "text-[var(--color-foreground-dim)]"
+                }`}
+              >
+                {o.label}
+              </span>
+            </>
+          );
+
+          const baseCls =
+            "flex-1 flex flex-col items-center gap-0.5 py-1 rounded transition-colors";
+          const stateCls = isSelected
+            ? "bg-purple-500/25 ring-1 ring-purple-400"
+            : state === "current"
+              ? "bg-purple-500/15"
+              : state === "done"
+                ? ""
+                : "opacity-40";
+
           return (
             <div key={o.key} className="flex items-center flex-1 min-w-0">
-              <div
-                className={`flex-1 flex flex-col items-center gap-0.5 py-1 rounded ${
-                  state === "current"
-                    ? "bg-purple-500/15"
-                    : state === "done"
-                      ? ""
-                      : "opacity-40"
-                }`}
-                title={
-                  stage?.exists && stage.updatedAt
-                    ? `${o.label} · ${new Date(stage.updatedAt).toLocaleString()}`
-                    : o.label
-                }
-              >
-                {state === "done" ? (
-                  <Check size={11} className="text-green-400" />
-                ) : state === "current" ? (
-                  <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
-                ) : (
-                  <Circle
-                    size={9}
-                    className="text-[var(--color-foreground-dim)]"
-                  />
-                )}
-                <span
-                  className={`text-[10px] font-medium ${
-                    state === "current"
-                      ? "text-purple-400"
-                      : state === "done"
-                        ? "text-green-400"
-                        : "text-[var(--color-foreground-dim)]"
-                  }`}
+              {clickable && onSelect ? (
+                <button
+                  type="button"
+                  onClick={() => onSelect(o.key)}
+                  title={title}
+                  className={`${baseCls} ${stateCls} hover:bg-purple-500/20 cursor-pointer`}
                 >
-                  {o.label}
-                </span>
-              </div>
+                  {inner}
+                </button>
+              ) : (
+                <div className={`${baseCls} ${stateCls}`} title={title}>
+                  {inner}
+                </div>
+              )}
               {!isLast && (
                 <div className="w-2 h-px bg-[var(--color-border)] shrink-0" />
               )}

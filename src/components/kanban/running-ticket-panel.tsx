@@ -88,26 +88,15 @@ export function RunningTicketPanel({ ticket, projectId, onClose }: Props) {
   const isLastStage = stage === "report";
   const isRunning = ticket.status === "in_progress";
 
-  // 아코디언 구성: 현재 단계까지 지나온 모든 산출물을 누적 표시.
-  // 이전 단계는 접힘(default closed), 현재 단계는 펼침(default open).
-  const SECTIONS: Array<{
-    key: PdcaStage;
-    label: string;
-    docType?: DocType;
-    file?: string;
-    isChecklist?: boolean;
-  }> = [
-    { key: "plan", label: "Plan", docType: "plan", file: "plan.md" },
-    { key: "design", label: "Design", docType: "design", file: "design.md" },
-    { key: "do", label: "Do · 구현 체크리스트", isChecklist: true },
-    { key: "check", label: "Check", docType: "analysis", file: "analysis.md" },
-    { key: "report", label: "Report", docType: "report", file: "report.md" },
-  ];
-  const currentIdx = stage
-    ? SECTIONS.findIndex((s) => s.key === stage)
-    : -1;
-  const visibleSections =
-    currentIdx >= 0 ? SECTIONS.slice(0, currentIdx + 1) : [];
+  // 사용자가 PDCA 카드에서 탭 클릭하여 열람 중인 단계.
+  // 티켓이 바뀌거나 stage가 다음 단계로 진행하면 자동으로 현재 단계로 sync.
+  const [selectedStage, setSelectedStage] = useState<PdcaStage | null>(stage);
+  useEffect(() => {
+    setSelectedStage(stage);
+  }, [ticket.id, stage]);
+
+  const selectedDoc = selectedStage ? STAGE_DOC[selectedStage] : null;
+  const docQuery = useTicketDoc(ticket.id, selectedDoc?.type ?? null);
 
   // 가로폭 리사이즈 (오버레이 형태) — localStorage에 저장하여 세션 간 유지
   const [width, setWidth] = useState<number>(() => {
@@ -444,29 +433,64 @@ export function RunningTicketPanel({ ticket, projectId, onClose }: Props) {
           </div>
         )}
 
-        {stage && <StagesCard ticketId={ticket.id} />}
-
-        {visibleSections.map((sec) =>
-          sec.isChecklist ? (
-            <StageAccordion
-              key={`${sec.key}-${stage}`}
-              label={sec.label}
-              defaultOpen={stage === sec.key}
-            >
-              <ChecklistCard ticketId={ticket.id} />
-            </StageAccordion>
-          ) : (
-            <StageDocAccordion
-              key={`${sec.key}-${stage}`}
-              ticketId={ticket.id}
-              type={sec.docType!}
-              label={sec.label}
-              file={sec.file!}
-              defaultOpen={stage === sec.key}
-              fontSize={markdownFontSize}
-            />
-          ),
+        {stage && (
+          <StagesCard
+            ticketId={ticket.id}
+            selected={selectedStage}
+            onSelect={(s) => setSelectedStage(s as PdcaStage)}
+          />
         )}
+
+        {selectedStage === "do" ? (
+          <ChecklistCard ticketId={ticket.id} />
+        ) : selectedDoc ? (
+          <div className="rounded border border-[var(--color-border)] p-2">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <FileText
+                size={11}
+                className="text-[var(--color-foreground-dim)]"
+              />
+              <span className="text-[10px] text-[var(--color-foreground-dim)]">
+                {selectedDoc.file}
+              </span>
+              {docQuery.data?.content && (
+                <span className="text-[10px] text-green-400">● 있음</span>
+              )}
+            </div>
+            {docQuery.isLoading ? (
+              <div className="text-[11px] text-[var(--color-foreground-dim)]">
+                확인 중…
+              </div>
+            ) : docQuery.data?.content ? (
+              <div
+                className="markdown-body max-h-80 overflow-y-auto pr-1"
+                style={{ fontSize: markdownFontSize }}
+              >
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    a: ({ href, children, ...props }) => (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        {...props}
+                      >
+                        {children}
+                      </a>
+                    ),
+                  }}
+                >
+                  {docQuery.data.content}
+                </ReactMarkdown>
+              </div>
+            ) : (
+              <div className="text-[11px] text-[var(--color-foreground-dim)]">
+                아직 작성되지 않았습니다.
+              </div>
+            )}
+          </div>
+        ) : null}
 
         <StageAccordion
           label="액션 타임라인"
@@ -600,65 +624,3 @@ function StageAccordion({
   );
 }
 
-/** 단계별 md 문서 아코디언 — useTicketDoc으로 내용 로드 */
-function StageDocAccordion({
-  ticketId,
-  type,
-  label,
-  file,
-  defaultOpen,
-  fontSize,
-}: {
-  ticketId: string;
-  type: DocType;
-  label: string;
-  file: string;
-  defaultOpen: boolean;
-  fontSize: number;
-}) {
-  const { data, isLoading } = useTicketDoc(ticketId, type);
-  return (
-    <StageAccordion
-      label={`${label} · ${file}`}
-      defaultOpen={defaultOpen}
-      badge={
-        data?.content ? (
-          <span className="text-[10px] text-green-400">● 있음</span>
-        ) : null
-      }
-    >
-      {isLoading ? (
-        <div className="text-[11px] text-[var(--color-foreground-dim)]">
-          확인 중…
-        </div>
-      ) : data?.content ? (
-        <div
-          className="markdown-body max-h-80 overflow-y-auto pr-1"
-          style={{ fontSize }}
-        >
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
-              a: ({ href, children, ...props }) => (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  {...props}
-                >
-                  {children}
-                </a>
-              ),
-            }}
-          >
-            {data.content}
-          </ReactMarkdown>
-        </div>
-      ) : (
-        <div className="text-[11px] text-[var(--color-foreground-dim)]">
-          아직 작성되지 않았습니다.
-        </div>
-      )}
-    </StageAccordion>
-  );
-}
