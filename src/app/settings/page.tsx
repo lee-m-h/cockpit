@@ -1,6 +1,7 @@
 import { ThemeSettings } from "@/components/settings/theme-settings";
 import { AppearanceSettings } from "@/components/settings/appearance-settings";
 import { EditorSettings } from "@/components/settings/editor-settings";
+import { NotificationsSettings } from "@/components/settings/notifications-settings";
 import { TerminalSettings } from "@/components/settings/terminal-settings";
 import { JiraSettings } from "@/components/settings/jira-settings";
 
@@ -12,6 +13,7 @@ export default function SettingsPage() {
         <ThemeSettings />
         <AppearanceSettings />
         <EditorSettings />
+        <NotificationsSettings />
         <TerminalSettings />
         <JiraSettings />
       </div>

@@ -7,6 +7,7 @@ import { Sidebar } from "./sidebar";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/ui-store";
 import { useTerminalStore } from "@/store/terminal-store";
+import { useTicketCompletionNotifier } from "@/hooks/use-ticket-completion-notifier";
 
 // 터미널 워크스페이스는 AppShell 하위에 항상 마운트되어 있으며,
 // /terminal 라우트가 아닐 때 hidden으로만 가려진다.
@@ -31,6 +32,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const onTerminal = pathname === "/terminal";
+
+  // 전역 티켓 완료 알림 — 모든 페이지에서 동작
+  useTicketCompletionNotifier();
 
   // 단축키:
   //  - Cmd/Ctrl + S   → 사이드바 토글 (어디서나)

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useActiveProjectStore } from "@/store/active-project-store";
 import { useProjects } from "@/hooks/use-projects";
 import { KanbanBoard } from "@/components/kanban/board";
@@ -10,10 +11,12 @@ export default function KanbanPage() {
   const setActive = useActiveProjectStore((s) => s.setActive);
   const { data } = useProjects();
   const projects = data?.projects ?? [];
+  const searchParams = useSearchParams();
+  const hasTicketParam = !!searchParams?.get("ticket");
 
-  // null = 전체 보기
+  // null = 전체 보기. 알림 클릭 진입(?ticket=...)이면 어떤 프로젝트든 찾을 수 있도록 전체 보기로 시작
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-    activeId,
+    hasTicketParam ? null : activeId,
   );
 
   // 선택된 프로젝트가 삭제됐으면 활성 프로젝트로 폴백

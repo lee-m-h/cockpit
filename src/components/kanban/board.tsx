@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
@@ -50,12 +51,26 @@ export function KanbanBoard({
 }: Props) {
   const { data, isLoading } = useTickets(projectId);
   const updateMut = useUpdateTicket(projectId);
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Ticket | null>(null);
   const [createStatus, setCreateStatus] = useState<TicketStatus>("backlog");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [jiraOpen, setJiraOpen] = useState(false);
   const [runningTicketId, setRunningTicketId] = useState<string | null>(null);
+
+  // ?ticket=<id> URL 파라미터(알림 클릭 등)로 상세 패널 자동 오픈
+  const ticketFromUrl = searchParams?.get("ticket") ?? null;
+  useEffect(() => {
+    if (!ticketFromUrl) return;
+    const tickets = data?.tickets ?? [];
+    if (tickets.some((t) => t.id === ticketFromUrl)) {
+      setRunningTicketId(ticketFromUrl);
+      // URL 파라미터 제거 — 닫은 뒤 다시 열리지 않게
+      router.replace("/kanban");
+    }
+  }, [ticketFromUrl, data?.tickets, router]);
   // Jira 이슈 임포트용
   const [importIssue, setImportIssue] = useState<{
     key: string;

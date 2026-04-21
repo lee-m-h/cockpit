@@ -77,7 +77,7 @@ export function StagesCard({ ticketId, selected, onSelect }: Props) {
                 />
               )}
               <span
-                className={`text-[10px] font-medium ${
+                className={`text-[10px] ${isSelected ? "font-bold" : "font-medium"} ${
                   state === "current"
                     ? "text-purple-400"
                     : state === "done"
@@ -90,15 +90,16 @@ export function StagesCard({ ticketId, selected, onSelect }: Props) {
             </>
           );
 
+          // 선택 상태는 하단 밑줄 + 볼드로 표시 (박스 강조 대신)
           const baseCls =
-            "flex-1 flex flex-col items-center gap-0.5 py-1 rounded transition-colors";
+            "flex-1 flex flex-col items-center gap-0.5 py-1 border-b-2 transition-colors";
           const stateCls = isSelected
-            ? "bg-purple-500/25 ring-1 ring-purple-400"
+            ? "border-[var(--color-accent)]"
             : state === "current"
-              ? "bg-purple-500/15"
+              ? "border-transparent"
               : state === "done"
-                ? ""
-                : "opacity-40";
+                ? "border-transparent"
+                : "border-transparent opacity-40";
 
           return (
             <div key={o.key} className="flex items-center flex-1 min-w-0">
@@ -107,7 +108,7 @@ export function StagesCard({ ticketId, selected, onSelect }: Props) {
                   type="button"
                   onClick={() => onSelect(o.key)}
                   title={title}
-                  className={`${baseCls} ${stateCls} hover:bg-purple-500/20 cursor-pointer`}
+                  className={`${baseCls} ${stateCls} hover:text-[var(--color-foreground)] cursor-pointer`}
                 >
                   {inner}
                 </button>
