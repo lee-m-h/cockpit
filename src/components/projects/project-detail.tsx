@@ -15,6 +15,7 @@ import { useActiveProjectStore } from "@/store/active-project-store";
 import { useProjectViewerStore } from "@/store/project-viewer-store";
 import { FileTree } from "./file-tree";
 import { FileViewerPanel } from "./file-viewer-panel";
+import { OpenInEditorButton } from "./open-in-editor-button";
 
 export function ProjectDetail({ projectId }: { projectId: string }) {
   const { data: project, isLoading, error } = useProject(projectId);
@@ -99,6 +100,12 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
         <Button onClick={openTerminal}>
           <TerminalIcon size={14} /> 터미널 열기
         </Button>
+        <OpenInEditorButton
+          path={project.path}
+          className="px-3 h-9 rounded-md border border-[var(--color-border)] text-sm hover:bg-[var(--color-surface-hover)]"
+          iconSize={14}
+          label="에디터로 열기"
+        />
         <Button variant="outline" onClick={() => router.push("/kanban")}>
           <KanbanSquare size={14} /> 칸반
         </Button>

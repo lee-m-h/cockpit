@@ -14,6 +14,7 @@ import {
 import { useTickets, useUpdateTicket } from "@/hooks/use-tickets";
 import { Button } from "@/components/ui/button";
 import { Plus, Inbox } from "lucide-react";
+import { OpenInEditorButton } from "@/components/projects/open-in-editor-button";
 import type { Ticket, TicketStatus } from "@/types/ticket";
 import { KanbanColumn } from "./column";
 import { TicketCard } from "./ticket-card";
@@ -72,6 +73,8 @@ export function KanbanBoard({
     ? (tickets.find((t) => t.id === runningTicketId) ?? null)
     : null;
   const showProjectBadge = !projectId; // 전체 보기일 때 프로젝트 뱃지 표시
+  const activeProjectPath =
+    projectId && projects ? projects.find((p) => p.id === projectId)?.path : null;
 
   const byStatus = (s: TicketStatus) =>
     tickets
@@ -163,6 +166,13 @@ export function KanbanBoard({
           </div>
         </div>
         <div className="flex items-center gap-1.5">
+          {projectId && activeProjectPath && (
+            <OpenInEditorButton
+              path={activeProjectPath}
+              className="px-2 h-7 rounded border border-[var(--color-border)] text-xs hover:bg-[var(--color-surface-hover)]"
+              label="에디터로 열기"
+            />
+          )}
           {projectId && (
             <Button
               size="sm"

@@ -83,17 +83,28 @@ export function useGitCommit(projectId: string | null, hash: string | null) {
 
 export function useGitDiff(
   projectId: string | null,
-  args: { commit?: string; path: string; staged?: boolean } | null,
+  args:
+    | {
+        commit?: string;
+        path: string;
+        staged?: boolean;
+        untracked?: boolean;
+      }
+    | null,
 ) {
   return useQuery<DiffResponse>({
     queryKey:
       projectId && args
-        ? KEYS.diff(projectId, args.commit, args.path, args.staged)
+        ? [
+            ...KEYS.diff(projectId, args.commit, args.path, args.staged),
+            args.untracked ?? false,
+          ]
         : ["git", "none"],
     queryFn: () => {
       const qs = new URLSearchParams({ path: args!.path });
       if (args?.commit) qs.set("commit", args.commit);
       if (args?.staged) qs.set("staged", "1");
+      if (args?.untracked) qs.set("untracked", "1");
       return api(`/api/git/${projectId}/diff?${qs}`);
     },
     enabled: !!projectId && !!args,

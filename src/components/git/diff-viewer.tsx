@@ -9,6 +9,8 @@ interface Props {
   commit?: string;
   path: string;
   staged?: boolean;
+  /** 추적 안 되는 파일: /dev/null 과 비교하여 전체 추가 diff로 표시 */
+  untracked?: boolean;
 }
 
 /**
@@ -48,11 +50,18 @@ function pairHunkLines(lines: DiffLine[]): Row[] {
   return rows;
 }
 
-export function DiffViewer({ projectId, commit, path, staged }: Props) {
+export function DiffViewer({
+  projectId,
+  commit,
+  path,
+  staged,
+  untracked,
+}: Props) {
   const { data, isLoading, error } = useGitDiff(projectId, {
     commit,
     path,
     staged,
+    untracked,
   });
 
   if (isLoading)

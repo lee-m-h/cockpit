@@ -19,6 +19,7 @@ interface Props {
 interface WorkingFileSelection {
   path: string;
   staged: boolean;
+  untracked?: boolean;
 }
 
 export function GitBoard({ projectId, projectName }: Props) {
@@ -32,8 +33,12 @@ export function GitBoard({ projectId, projectName }: Props) {
     setSelectedHash(hash);
     setWorkingFile(null);
   };
-  const selectWorkingFile = (path: string, staged: boolean) => {
-    setWorkingFile({ path, staged });
+  const selectWorkingFile = (
+    path: string,
+    staged: boolean,
+    untracked?: boolean,
+  ) => {
+    setWorkingFile({ path, staged, untracked });
     setSelectedHash(null);
   };
 
@@ -95,12 +100,17 @@ function WorkingFileDiff({
   file: WorkingFileSelection;
   onClear: () => void;
 }) {
+  const label = file.untracked
+    ? "UNTRACKED"
+    : file.staged
+      ? "STAGED"
+      : "WORKING TREE";
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="p-3 border-b border-[var(--color-border)] flex-shrink-0">
         <div className="flex items-center gap-2 text-[10px] font-mono">
           <span className="px-1.5 rounded bg-[var(--color-surface-hover)] text-[var(--color-foreground-muted)]">
-            {file.staged ? "STAGED" : "WORKING TREE"}
+            {label}
           </span>
           <span className="text-[var(--color-foreground-dim)]">·</span>
           <span className="truncate flex-1">{file.path}</span>
@@ -118,6 +128,7 @@ function WorkingFileDiff({
           commit={undefined}
           path={file.path}
           staged={file.staged}
+          untracked={file.untracked}
         />
       </div>
     </div>

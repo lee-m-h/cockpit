@@ -15,6 +15,7 @@ export async function GET(
   const path = searchParams.get("path");
   const commit = searchParams.get("commit") ?? undefined;
   const staged = searchParams.get("staged") === "1";
+  const untracked = searchParams.get("untracked") === "1";
 
   if (!path) {
     return NextResponse.json({ error: "path is required" }, { status: 400 });
@@ -25,6 +26,7 @@ export async function GET(
       commit,
       path,
       staged,
+      untracked,
     });
     const hunks = oversize ? [] : parseUnifiedDiff(text);
     return NextResponse.json({ oversize, size, hunks });

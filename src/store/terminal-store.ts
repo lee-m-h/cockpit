@@ -27,6 +27,9 @@ interface TerminalState {
   /** UI 선호도 — 각 탭별 본문 폰트 크기 (px) */
   terminalFontSize: number;
   markdownFontSize: number;
+  /** 외부 에디터로 열기 기본값 */
+  preferredEditor: string; // "vscode" | "cursor" | "webstorm" | "idea" | "sublime" | "custom"
+  customEditorCommand: string;
 
   createTab: (opts?: {
     cwd?: string;
@@ -58,6 +61,10 @@ interface TerminalState {
   setTerminalFontSize: (px: number) => void;
   /** 마크다운 뷰 폰트 크기 설정 */
   setMarkdownFontSize: (px: number) => void;
+  /** 선호 에디터 설정 */
+  setPreferredEditor: (editor: string) => void;
+  /** 커스텀 에디터 명령 설정 */
+  setCustomEditorCommand: (cmd: string) => void;
 
   /** 탭 복제 — 동일한 type/url/cwd로 새 탭 생성 */
   duplicateTab: (tabId: string) => Promise<string | null>;
@@ -414,6 +421,8 @@ export const useTerminalStore = create<TerminalState>()(
       recentUrls: [],
       terminalFontSize: 13,
       markdownFontSize: 14,
+      preferredEditor: "vscode",
+      customEditorCommand: "",
 
       createTab: async (opts) => {
         const res = await createPty(opts);
@@ -581,6 +590,9 @@ export const useTerminalStore = create<TerminalState>()(
         const v = Math.min(Math.max(Math.round(px), 10), 32);
         set({ markdownFontSize: v });
       },
+
+      setPreferredEditor: (editor) => set({ preferredEditor: editor }),
+      setCustomEditorCommand: (cmd) => set({ customEditorCommand: cmd }),
 
       reorderPanes: (sourceId, targetId) => {
         if (sourceId === targetId) return;
@@ -756,6 +768,8 @@ export const useTerminalStore = create<TerminalState>()(
         recentUrls: s.recentUrls,
         terminalFontSize: s.terminalFontSize,
         markdownFontSize: s.markdownFontSize,
+        preferredEditor: s.preferredEditor,
+        customEditorCommand: s.customEditorCommand,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {

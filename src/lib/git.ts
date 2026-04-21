@@ -73,7 +73,8 @@ export async function isGitRepo(cwd: string): Promise<boolean> {
 export async function getStatus(cwd: string): Promise<RepoStatus> {
   const [branch, statusOutput, aheadBehind] = await Promise.all([
     git(cwd, ["branch", "--show-current"]),
-    git(cwd, ["status", "--porcelain"]),
+    // -uall: untracked 디렉토리를 폴더 단위가 아닌 **개별 파일**로 나열 → diff 뷰어와 호환
+    git(cwd, ["status", "--porcelain", "-uall"]),
     git(cwd, ["rev-list", "--left-right", "--count", "@{u}...HEAD"]).catch(
       () => "0\t0",
     ),
@@ -267,11 +268,21 @@ const DIFF_MAX_BYTES = 2 * 1024 * 1024;
 
 export async function getFileDiff(
   cwd: string,
-  opts: { commit?: string; path: string; staged?: boolean },
+  opts: {
+    commit?: string;
+    path: string;
+    staged?: boolean;
+    untracked?: boolean;
+  },
 ): Promise<{ size: number; oversize: boolean; text: string }> {
   validateRelPath(opts.path);
   let args: string[];
-  if (opts.commit) {
+  if (opts.untracked) {
+    // 추적 안 되는 파일은 git diff가 빈 결과 → /dev/null 과 비교해 전체를 "추가" diff로 표현
+    // `git diff --no-index`는 diff가 있으면 exit 1이지만 stdout에 결과가 담김 (git() 헬퍼가 stdout 반환)
+    const nullDev = process.platform === "win32" ? "NUL" : "/dev/null";
+    args = ["diff", "--no-index", "--no-color", "--", nullDev, opts.path];
+  } else if (opts.commit) {
     validateHash(opts.commit);
     args = ["show", "--format=", "--no-color", opts.commit, "--", opts.path];
   } else if (opts.staged) {

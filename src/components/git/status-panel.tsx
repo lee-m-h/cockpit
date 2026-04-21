@@ -19,8 +19,12 @@ import { CommitBox } from "./commit-box";
 
 interface Props {
   projectId: string;
-  onSelectFile?: (path: string, staged: boolean) => void;
-  selectedFile?: { path: string; staged: boolean } | null;
+  onSelectFile?: (path: string, staged: boolean, untracked?: boolean) => void;
+  selectedFile?: {
+    path: string;
+    staged: boolean;
+    untracked?: boolean;
+  } | null;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -162,13 +166,21 @@ export function StatusPanel({ projectId, onSelectFile, selectedFile }: Props) {
             ) : null
           }
         >
-          {data.untracked.map((p) => (
+          {data.untracked.map((p) => {
+            const isDir = p.endsWith("/");
+            return (
             <FileRow
               key={`n-${p}`}
               icon={<FileQuestion size={11} />}
               path={p}
-              status="?"
+              status={isDir ? "?/" : "?"}
               tone="muted"
+              selected={
+                selectedFile?.path === p && selectedFile.untracked === true
+              }
+              onClick={
+                isDir ? undefined : () => onSelectFile?.(p, false, true)
+              }
               actions={
                 <button
                   className="p-0.5 rounded hover:bg-[var(--color-background)] text-[var(--color-foreground-dim)]"
@@ -182,7 +194,8 @@ export function StatusPanel({ projectId, onSelectFile, selectedFile }: Props) {
                 </button>
               }
             />
-          ))}
+            );
+          })}
         </Section>
       </div>
       <CommitBox projectId={projectId} />
