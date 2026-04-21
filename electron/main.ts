@@ -194,10 +194,11 @@ function startServer(): void {
   const serverScript = path.join(ROOT, "server.ts");
   const tsxBin = path.join(ROOT, "node_modules", ".bin", "tsx");
 
-  // tsx 바이너리가 없으면 설치 안 됐다는 뜻
+  // tsx 바이너리가 없으면 설치 안 됐다는 뜻 — dev 모드에서만 에러.
+  // 패키지드 환경에서는 app.whenReady에서 installCockpitIfNeeded()가 먼저 처리함.
   if (!fs.existsSync(tsxBin)) {
     const detail = app.isPackaged
-      ? `Cockpit 소스가 ~/.cockpit-app 에 설치되어 있지 않습니다.\n\n터미널에서 다음을 실행해 설치해주세요:\n\n  curl -fsSL https://raw.githubusercontent.com/lee-m-h/cockpit/main/install.sh | bash\n\n확인 경로: ${ROOT}`
+      ? `설치가 완료되지 않았습니다.\n\n경로: ${tsxBin}\n\n앱을 다시 실행하거나 터미널에서:\n  curl -fsSL https://raw.githubusercontent.com/lee-m-h/cockpit/main/install.sh | bash`
       : `tsx 바이너리를 찾을 수 없습니다.\n\n경로: ${tsxBin}\n\n'pnpm install' 을 실행해주세요.`;
     dialog.showErrorBox("Cockpit 시작 실패", detail);
     app.quit();
@@ -335,9 +336,174 @@ function createWindow(): void {
   });
 }
 
+// ─── 최초 설치 (패키지드 .app 전용) ───────────────────────────
+
+/** macOS launchd로 띄워진 앱은 PATH가 매우 제한적이라 Homebrew/nvm 경로를 덧붙여줘야 함 */
+function buildInstallEnv(): NodeJS.ProcessEnv {
+  const home = os.homedir();
+  const extraPaths = [
+    "/opt/homebrew/bin",
+    "/opt/homebrew/sbin",
+    "/usr/local/bin",
+    "/usr/local/sbin",
+    path.join(home, ".nvm", "versions", "node"), // nvm root (버전별은 shell alias로 해결)
+    path.join(home, ".local", "bin"),
+  ];
+  return {
+    ...process.env,
+    PATH: [...extraPaths, process.env.PATH ?? ""].filter(Boolean).join(":"),
+    HOME: home,
+  };
+}
+
+/** 설치 진행 상황을 보여주는 splash 창 — data URL로 인라인 HTML 로드 */
+function createSplashWindow(): BrowserWindow {
+  const splash = new BrowserWindow({
+    width: 520,
+    height: 360,
+    resizable: false,
+    frame: false,
+    transparent: false,
+    backgroundColor: "#0b0d12",
+    webPreferences: { contextIsolation: true, nodeIntegration: false },
+  });
+  const html = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<title>Cockpit 설치</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    background: #0b0d12; color: #e4e4e7;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    height: 100vh; display: flex; flex-direction: column; gap: 12px;
+  }
+  .title { font-size: 16px; font-weight: 600; }
+  .sub { font-size: 12px; color: #a1a1aa; }
+  .spinner {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid #7c3aed44; border-top-color: #a78bfa;
+    animation: spin 0.8s linear infinite;
+  }
+  .row { display: flex; align-items: center; gap: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #log {
+    flex: 1; margin: 0; padding: 10px 12px;
+    background: #000; color: #c7c7cc;
+    font-family: "SF Mono", Menlo, monospace; font-size: 11px;
+    border: 1px solid #27272a; border-radius: 6px;
+    overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+  }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="spinner"></div>
+    <div class="title">Cockpit 최초 설치 중…</div>
+  </div>
+  <div class="sub">GitHub에서 소스와 의존성을 받아 ~/.cockpit-app 에 설치합니다. 2-5분 정도 걸릴 수 있어요.</div>
+  <pre id="log"></pre>
+  <script>
+    window.appendLog = (t) => {
+      const el = document.getElementById('log');
+      el.textContent += t;
+      el.scrollTop = el.scrollHeight;
+    };
+  </script>
+</body>
+</html>`;
+  splash.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(html));
+  return splash;
+}
+
+/** ~/.cockpit-app 소스가 없으면 install.sh 자동 실행 — 패키지드 환경에서만 동작 */
+async function installCockpitIfNeeded(): Promise<void> {
+  if (!app.isPackaged) return;
+  const tsxBin = path.join(COCKPIT_APP_HOME, "node_modules", ".bin", "tsx");
+  if (fs.existsSync(tsxBin)) return;
+
+  const { response } = await dialog.showMessageBox({
+    type: "info",
+    title: "Cockpit 최초 설치",
+    message: "Cockpit 소스를 설치하시겠습니까?",
+    detail:
+      "~/.cockpit-app 에 GitHub 저장소를 clone하고 의존성을 설치합니다 (약 200MB, 2-5분 소요).\n\n필요 사항: Node.js 20+, git, curl\n(pnpm은 자동 설치)",
+    buttons: ["설치", "취소"],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response !== 0) {
+    app.quit();
+    return Promise.reject(new Error("사용자가 설치를 취소했습니다."));
+  }
+
+  const splash = createSplashWindow();
+  const logPath = path.join(COCKPIT_USER_DATA, "install.log");
+  try {
+    fs.writeFileSync(logPath, `[${new Date().toISOString()}] install 시작\n`);
+  } catch {
+    // ignore
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const installScript =
+      "curl -fsSL https://raw.githubusercontent.com/lee-m-h/cockpit/main/install.sh | bash";
+    const child = spawn("bash", ["-lc", installScript], {
+      env: buildInstallEnv(),
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    const appendLog = (text: string) => {
+      try {
+        fs.appendFileSync(logPath, text);
+      } catch {
+        // ignore
+      }
+      if (!splash.isDestroyed()) {
+        splash.webContents
+          .executeJavaScript(`window.appendLog(${JSON.stringify(text)})`)
+          .catch(() => {
+            // ignore
+          });
+      }
+    };
+
+    child.stdout?.on("data", (d: Buffer) => appendLog(d.toString()));
+    child.stderr?.on("data", (d: Buffer) =>
+      appendLog(`[ERR] ${d.toString()}`),
+    );
+    child.on("close", (code) => {
+      if (code === 0) resolve();
+      else
+        reject(
+          new Error(
+            `install.sh 실패 (exit ${code}). 자세한 로그: ${logPath}`,
+          ),
+        );
+    });
+    child.on("error", (err) => reject(err));
+  }).finally(() => {
+    if (!splash.isDestroyed()) splash.close();
+  });
+}
+
 // ─── 앱 라이프사이클 ─────────────────────────────────────────
 app.whenReady().then(async () => {
   buildMenu();
+
+  // 최초 실행 시 소스 자동 설치
+  try {
+    await installCockpitIfNeeded();
+  } catch (err) {
+    dialog.showErrorBox(
+      "Cockpit 설치 실패",
+      `${(err as Error).message}\n\n터미널에서 수동 설치를 시도해보세요:\n  curl -fsSL https://raw.githubusercontent.com/lee-m-h/cockpit/main/install.sh | bash`,
+    );
+    app.quit();
+    return;
+  }
 
   // 빈 포트 먼저 확보 — 저장된 포트 우선, 4000 대기, 4001~4020 시도
   PORT = await findFreePort(4000);
