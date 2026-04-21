@@ -1,12 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useActiveProjectStore } from "@/store/active-project-store";
 import { useProjects } from "@/hooks/use-projects";
 import { KanbanBoard } from "@/components/kanban/board";
 
+/**
+ * Next.js 15는 useSearchParams()를 쓰는 클라이언트 컴포넌트를
+ * 반드시 <Suspense> 경계 안에 두도록 강제한다 (CSR bailout).
+ * 그래서 search params를 읽는 실제 페이지는 내부 컴포넌트로 분리하고,
+ * default export에서 Suspense로 감싸 노출한다.
+ */
 export default function KanbanPage() {
+  return (
+    <Suspense fallback={null}>
+      <KanbanPageInner />
+    </Suspense>
+  );
+}
+
+function KanbanPageInner() {
   const activeId = useActiveProjectStore((s) => s.activeProjectId);
   const setActive = useActiveProjectStore((s) => s.setActive);
   const { data } = useProjects();
