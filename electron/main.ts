@@ -193,6 +193,7 @@ function startServer(): void {
 
   const serverScript = path.join(ROOT, "server.ts");
   const tsxBin = path.join(ROOT, "node_modules", ".bin", "tsx");
+  const nextBuildId = path.join(ROOT, ".next", "BUILD_ID");
 
   // tsx 바이너리가 없으면 설치 안 됐다는 뜻 — dev 모드에서만 에러.
   // 패키지드 환경에서는 app.whenReady에서 installCockpitIfNeeded()가 먼저 처리함.
@@ -205,15 +206,26 @@ function startServer(): void {
     return;
   }
 
+  // 패키지드 환경은 production 모드로 돌리므로 .next 빌드가 필요.
+  // 설치 스크립트가 build까지 책임지지만, 구버전 잔여분이 있거나 업데이트 직후엔 누락될 수 있음.
+  if (app.isPackaged && !fs.existsSync(nextBuildId)) {
+    dialog.showErrorBox(
+      "Cockpit 시작 실패",
+      `Next.js 빌드가 없습니다. 터미널에서 아래를 실행해 주세요:\n\n  cd ~/.cockpit-app && pnpm build\n\n그 후 앱을 다시 실행하세요.`,
+    );
+    app.quit();
+    return;
+  }
+
   const child = spawn(tsxBin, [serverScript], {
     cwd: ROOT,
     // buildSpawnEnv()로 nvm/Homebrew PATH 보강 — tsx가 내부적으로 `node`를 찾아 실행하므로 필수.
-    // macOS launchd 앱의 기본 PATH는 /usr/bin:/bin:/usr/sbin:/sbin 뿐이라 node가 없음.
+    // 패키지드 .app은 production 모드로 돌려 dev 모드 JIT 컴파일 오버헤드를 제거.
     env: {
       ...buildSpawnEnv(),
       PORT: String(PORT),
       HOST: "127.0.0.1",
-      NODE_ENV: "development",
+      NODE_ENV: app.isPackaged ? "production" : "development",
     },
     stdio: ["ignore", "pipe", "pipe"],
     shell: process.platform === "win32",
@@ -479,7 +491,8 @@ async function installCockpitIfNeeded(): Promise<void> {
     const installScript =
       "curl -fsSL https://raw.githubusercontent.com/lee-m-h/cockpit/main/install.sh | bash";
     const child = spawn("bash", ["-lc", installScript], {
-      env: buildSpawnEnv(),
+      // COCKPIT_INSTALL_ONLY=1 → install.sh가 Electron 실행 안 하고 종료 (중복 실행 방지)
+      env: { ...buildSpawnEnv(), COCKPIT_INSTALL_ONLY: "1" },
       stdio: ["ignore", "pipe", "pipe"],
     });
 

@@ -134,6 +134,21 @@ pnpm prisma generate >/dev/null
 log "DB 마이그레이션…"
 pnpm prisma migrate deploy 2>/dev/null || pnpm prisma migrate dev --name init --skip-seed
 
+# ---------- Next.js production build ----------
+# .next가 없거나 소스보다 오래되면 재빌드 → dev 모드의 JIT 컴파일 오버헤드 제거
+NEEDS_BUILD=0
+if [[ ! -f ".next/BUILD_ID" ]]; then
+  NEEDS_BUILD=1
+elif [[ "package.json" -nt ".next/BUILD_ID" ]] || [[ "next.config.ts" -nt ".next/BUILD_ID" ]]; then
+  NEEDS_BUILD=1
+elif find src -newer ".next/BUILD_ID" -type f -print -quit 2>/dev/null | grep -q .; then
+  NEEDS_BUILD=1
+fi
+if [[ "$NEEDS_BUILD" == "1" ]]; then
+  log "Next.js 프로덕션 빌드 중 (1-3분 소요)…"
+  pnpm build
+fi
+
 # ---------- run ----------
 mkdir -p "$LOG_DIR"
 PORT="${PORT:-4000}"

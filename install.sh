@@ -83,8 +83,10 @@ if [[ -n "$SHELL_PROFILE" ]]; then
   eval "$SHELL_CMD"
 fi
 
-# ---------- macOS 앱 등록 ----------
-if [[ "$(uname)" == "Darwin" ]]; then
+# ---------- macOS 앱 등록 (수동 설치 경로에서만) ----------
+# .app 자동설치 경로(COCKPIT_INSTALL_ONLY=1)에선 이미 정식 /Applications/Cockpit.app이 있으므로
+# 중복 shell 런처를 만들지 않는다.
+if [[ "$(uname)" == "Darwin" ]] && [[ "${COCKPIT_INSTALL_ONLY:-}" != "1" ]]; then
   APP_DIR="$HOME/Applications/Cockpit.app"
   if [[ ! -d "$APP_DIR" ]]; then
     log "macOS 앱으로 등록 중…"
@@ -129,8 +131,29 @@ PLIST
   fi
 fi
 
+# ---------- 의존성 + 빌드 ----------
+# .app 자동설치 경로(COCKPIT_INSTALL_ONLY=1)에서는 Electron을 띄우지 않고 준비만.
+# 일반 curl|bash 경로에서도 build를 미리 해둬 첫 실행 속도를 확보.
+log "의존성 설치 중…"
+pnpm install
+
+log "Prisma 클라이언트 생성…"
+pnpm prisma generate >/dev/null
+
+log "DB 마이그레이션…"
+pnpm prisma migrate deploy 2>/dev/null || pnpm prisma migrate dev --name init --skip-seed
+
+log "Next.js 프로덕션 빌드 (1-3분 소요)…"
+pnpm build
+
 # ---------- 실행 ----------
 log "설치 완료!"
+
+if [[ "${COCKPIT_INSTALL_ONLY:-}" == "1" ]]; then
+  log ".app에서 호출됨 — Electron 실행 생략. 메인 앱이 이어서 실행합니다."
+  exit 0
+fi
+
 echo ""
 echo "  ┌──────────────────────────────────────────┐"
 echo "  │  새 터미널을 열거나 아래 명령어를 실행:   │"
