@@ -6,8 +6,12 @@ import * as fs from "fs";
 import * as net from "net";
 import * as os from "os";
 
-// 앱 이름 설정 (Dock, 메뉴바, 창 타이틀에 표시됨)
+// 앱 이름 및 Bundle ID (macOS 알림 센터/Launchpad 등록에 사용)
 app.setName("Cockpit");
+// Windows: AppUserModelId (작업 표시줄 그룹화 + 알림 표시에 필요)
+if (process.platform === "win32") {
+  app.setAppUserModelId("dev.cockpit.app");
+}
 
 // userData 경로 고정 — 업데이트 후에도 동일한 localStorage/쿠키 유지.
 // 기본은 ~/Library/Application Support/{app-name}인데, 실행 환경(네이티브 앱/dev/etc)에 따라
@@ -62,7 +66,17 @@ app.setPath("userData", COCKPIT_USER_DATA);
 
 
 
-const ROOT = path.resolve(__dirname, "..");
+/**
+ * 실행 환경별 ROOT 결정:
+ *   - dev (pnpm electron:dev): 레포 루트 (소스 직접 참조)
+ *   - 패키지된 .app: ~/.cockpit-app (install.sh로 사용자 홈에 설치된 소스)
+ *     .app 번들에는 소스/node_modules/Prisma 엔진이 들어있지 않으므로
+ *     "런처"로만 동작하고 실제 서버는 설치된 소스에서 실행한다.
+ */
+const COCKPIT_APP_HOME = path.join(os.homedir(), ".cockpit-app");
+const ROOT = app.isPackaged
+  ? COCKPIT_APP_HOME
+  : path.resolve(__dirname, "..");
 
 let mainWindow: BrowserWindow | null = null;
 let serverProcess: ChildProcess | null = null;
@@ -182,10 +196,10 @@ function startServer(): void {
 
   // tsx 바이너리가 없으면 설치 안 됐다는 뜻
   if (!fs.existsSync(tsxBin)) {
-    dialog.showErrorBox(
-      "Cockpit 시작 실패",
-      `tsx 바이너리를 찾을 수 없습니다.\n\n경로: ${tsxBin}\n\n터미널에서 'cd ~/.cockpit-app && pnpm install' 을 실행해주세요.`,
-    );
+    const detail = app.isPackaged
+      ? `Cockpit 소스가 ~/.cockpit-app 에 설치되어 있지 않습니다.\n\n터미널에서 다음을 실행해 설치해주세요:\n\n  curl -fsSL https://raw.githubusercontent.com/lee-m-h/cockpit/main/install.sh | bash\n\n확인 경로: ${ROOT}`
+      : `tsx 바이너리를 찾을 수 없습니다.\n\n경로: ${tsxBin}\n\n'pnpm install' 을 실행해주세요.`;
+    dialog.showErrorBox("Cockpit 시작 실패", detail);
     app.quit();
     return;
   }
