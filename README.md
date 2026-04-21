@@ -4,6 +4,13 @@
 
 F&F 팀 내부 개발 도구. `claude-chat` `claude-kanban` `git-pilot` 3개 프로젝트를 단일 앱으로 통합.
 
+> 📖 **공식 사이트 / 상세 가이드**: <https://lee-m-h.github.io/cockpit/>
+>
+> **한 줄 설치 (macOS):**
+> ```bash
+> curl -fsSL https://github.com/lee-m-h/cockpit/releases/latest/download/install-macos.sh | bash
+> ```
+
 ---
 
 ## 기능
