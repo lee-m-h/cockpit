@@ -207,8 +207,10 @@ function startServer(): void {
 
   const child = spawn(tsxBin, [serverScript], {
     cwd: ROOT,
+    // buildSpawnEnv()로 nvm/Homebrew PATH 보강 — tsx가 내부적으로 `node`를 찾아 실행하므로 필수.
+    // macOS launchd 앱의 기본 PATH는 /usr/bin:/bin:/usr/sbin:/sbin 뿐이라 node가 없음.
     env: {
-      ...process.env,
+      ...buildSpawnEnv(),
       PORT: String(PORT),
       HOST: "127.0.0.1",
       NODE_ENV: "development",
@@ -338,17 +340,43 @@ function createWindow(): void {
 
 // ─── 최초 설치 (패키지드 .app 전용) ───────────────────────────
 
-/** macOS launchd로 띄워진 앱은 PATH가 매우 제한적이라 Homebrew/nvm 경로를 덧붙여줘야 함 */
-function buildInstallEnv(): NodeJS.ProcessEnv {
+/** nvm으로 설치된 Node 중 가장 최신 버전의 bin 디렉토리 반환 */
+function findNvmNodeBin(): string | null {
+  const nvmRoot = path.join(os.homedir(), ".nvm", "versions", "node");
+  try {
+    const versions = fs
+      .readdirSync(nvmRoot)
+      .filter((v) => /^v\d+\.\d+\.\d+$/.test(v));
+    if (versions.length === 0) return null;
+    // semver desc 정렬 — 최신 버전 우선
+    versions.sort((a, b) => {
+      const [am, ai, ap] = a.slice(1).split(".").map(Number);
+      const [bm, bi, bp] = b.slice(1).split(".").map(Number);
+      return bm - am || bi - ai || bp - ap;
+    });
+    return path.join(nvmRoot, versions[0], "bin");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * macOS launchd로 띄워진 앱은 PATH가 매우 제한적이라
+ * Homebrew/nvm/로컬 경로를 모두 prepend한 환경을 만든다.
+ * install.sh 실행과 server(tsx) spawn 양쪽에서 사용.
+ */
+function buildSpawnEnv(): NodeJS.ProcessEnv {
   const home = os.homedir();
-  const extraPaths = [
+  const nvmBin = findNvmNodeBin();
+  const extraPaths: string[] = [];
+  if (nvmBin) extraPaths.push(nvmBin);
+  extraPaths.push(
     "/opt/homebrew/bin",
     "/opt/homebrew/sbin",
     "/usr/local/bin",
     "/usr/local/sbin",
-    path.join(home, ".nvm", "versions", "node"), // nvm root (버전별은 shell alias로 해결)
     path.join(home, ".local", "bin"),
-  ];
+  );
   return {
     ...process.env,
     PATH: [...extraPaths, process.env.PATH ?? ""].filter(Boolean).join(":"),
@@ -451,7 +479,7 @@ async function installCockpitIfNeeded(): Promise<void> {
     const installScript =
       "curl -fsSL https://raw.githubusercontent.com/lee-m-h/cockpit/main/install.sh | bash";
     const child = spawn("bash", ["-lc", installScript], {
-      env: buildInstallEnv(),
+      env: buildSpawnEnv(),
       stdio: ["ignore", "pipe", "pipe"],
     });
 
